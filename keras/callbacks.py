@@ -208,6 +208,7 @@ class BaseLogger(Callback):
         self.totals = {}
 
     def on_batch_end(self, batch, logs=None):
+        return
         logs = logs or {}
         batch_size = logs.get('size', 0)
         self.seen += batch_size
@@ -219,6 +220,7 @@ class BaseLogger(Callback):
                 self.totals[k] = v * batch_size
 
     def on_epoch_end(self, epoch, logs=None):
+        return
         if logs is not None:
             for k in self.params['metrics']:
                 if k in self.totals:
@@ -985,3 +987,113 @@ class LambdaCallback(Callback):
             self.on_train_end = on_train_end
         else:
             self.on_train_end = lambda logs: None
+
+
+class BinaryLogger(Callback):
+    """Callback that estimates binary metrics.
+
+    In order to use this logger, BinaryRawCounts must be added to the model metrics
+    e. g.: model.fil(metrics=[ ... ]+BinaryLogger.BinaryRawCounts,
+                     callbacks=[BinaryLogger(), ...],
+                     ...)
+
+    """
+    def __init__(self, metrics=['recall', 'precision', 'fmeasure'], beta=1.0):
+        self.metrics = metrics
+        self.beta = beta
+
+    def on_epoch_begin(self, epoch, logs=None):
+        self.seen = 0
+        self.totals = {}
+
+    def on_batch_end(self, batch, logs=None):
+        logs = logs or {}
+        self.seen += logs.get('size', 0)  # batch_size
+        metric_keys = [x.__name__ for x in BinaryLogger.BinaryRawCounts]
+        for k in metric_keys:
+            if k in logs.keys():
+                if k in self.totals:
+                    self.totals[k] += logs[k]
+                else:
+                    self.totals[k] = logs[k]
+            else:
+                raise 'BinaryLogger requires all binary raw binary counts (TP, TN, FP, FN) to be '\
+                    'added to the model metrics: metrics=[...]+BinaryLogger.BinaryRawCounts'
+
+    def on_epoch_end(self, epoch, logs=None):
+        if logs is not None:
+            for k in self.params['metrics']:
+                if k in self.totals:
+                    logs[k] = self.totals[k]
+        _M = {}
+        _M['N'] = _M['num_samples'] = \
+            logs['binary_true_positives'] + logs['binary_true_negatives'] + \
+            logs['binary_false_positives'] + logs['binary_false_negatives']
+        _M['tp'] = _M['true_positives'] = logs['binary_true_positives'] / float(_M['N'])
+        _M['tn'] = _M['true_positives'] = logs['binary_true_negatives'] / float(_M['N'])
+        _M['fp'] = _M['false_positives'] = logs['binary_false_positives'] / float(_M['N'])
+        _M['fn'] = _M['false_negatives'] = logs['binary_false_negatives'] / float(_M['N'])
+
+        _M['pp'] = _M['bias'] = _M['pred_positives'] = _M['tp'] + _M['fp']
+        _M['pn'] = _M['pred_negatives'] = _M['tn'] + _M['fn']
+        _M['rn'] = _M['real_negatives'] = _M['tn'] + _M['fp']
+        _M['rp'] = _M['real_positives'] = _M['prevalence'] = _M['tp'] + _M['fn']
+        _M['cr'] = _M['class_ratio'] = _M['rn'] / _M['rp']
+
+        _M['tpr'] = _M['recall'] = _M['sensitivity'] = _M['hit_rate'] = _M['tp'] / _M['rp']
+        _M['tnr'] = _M['inverse_recall'] = _M['specificity'] = _M['tn'] / _M['rn']
+        _M['fpr'] = _M['fall_out'] = _M['fp'] / _M['rp']
+        _M['fnr'] = _M['miss_rate'] = _M['fn'] / _M['rn']
+
+        _M['ppv'] = _M['precision'] = _M['confidence'] = \
+            _M['positive_predictive_value'] = _M['tp'] / _M['pp']
+        _M['npv'] = _M['inverse_precision'] = _M['negative_predictive_value'] = _M['tn'] / _M['pn']
+        _M['fdr'] = _M['false_discovery_rate'] = 1.0 - _M['ppv']
+        _M['for'] = _M['false_omission_rate'] = 1.0 - _M['npv']
+
+        _M['amean'] = _M['arithmetic_mean'] = (_M['tpr'] + _M['ppv']) / 2.0
+        _M['gmean'] = _M['geometric_mean'] = _M['gmeasure'] = np.sqrt(_M['tpr'] * _M['ppv'])
+        _M['hmean'] = _M['f1s'] = _M['harmonic_mean'] = \
+            _M['fmeasure'] = _M['f1score'] = 2.0 * _M['tpr'] * _M['ppv'] / (_M['tpr'] + _M['ppv'])
+        _M['fmeasure_2'] = 2.0 * _M['tp'] / (2.0 * _M['tp'] + _M['fp'] + _M['fn'])
+        _M['fbs'] = _M['fbeta'] = \
+            (1 + self.beta**2) * _M['ppv'] * _M['tpr'] / (self.beta**2 * _M['ppv'] + _M['tpr'])
+
+        _M['acc_2'] = _M['accuracy_2'] = _M['tp'] + _M['tn']
+        _M['jcd'] = _M['jaccard'] = _M['tanimoto_similarity_coefficient'] = \
+            _M['tp'] / (_M['tp'] + _M['fn'] + _M['fp'])
+
+        _M['auc'] = (_M['tpr'] + _M['tnr']) / 2.0
+        _M['inf'] = _M['informedness'] = _M['tpr'] + _M['tnr'] - 1
+        _M['mrk'] = _M['markedness'] = _M['ppv'] + _M['npv'] - 1
+
+        for x in self.metrics:
+            logs[x] = _M[x]
+
+    def binary_true_positives(y_true, y_pred):
+        return K.sum(K.round(K.clip(y_true * y_pred, 0, 1)))
+
+    def binary_true_negatives(y_true, y_pred):
+        return K.sum(K.round(K.clip((1.0-y_true) * (1.0-y_pred), 0, 1)))
+
+    def binary_false_positives(y_true, y_pred):
+        return K.sum(K.round(K.clip((1.0-y_true) * y_pred, 0, 1)))
+
+    def binary_false_negatives(y_true, y_pred):
+        return K.sum(K.round(K.clip(y_true * (1.0-y_pred), 0, 1)))
+
+    BinaryRawCounts = [binary_true_positives, binary_true_negatives,
+                       binary_false_positives, binary_false_negatives]
+    BinaryMetrics = [
+        'N', 'num_samples', 'tp', 'true_positives', 'tn', 'true_positives',
+        'fp', 'false_positives', 'fn', 'false_negatives', 'pp', 'bias', 'pred_positives',
+        'pn', 'pred_negatives', 'rn', 'real_negatives', 'rp', 'real_positives', 'prevalence',
+        'cr', 'class_ratio', 'tpr', 'recall', 'sensitivity', 'hit_rate',
+        'tnr', 'inverse_recall', 'specificity', 'fpr', 'fall_out', 'fnr', 'miss_rate',
+        'ppv', 'precision', 'confidence', 'positive_predictive_value',
+        'npv', 'inverse_precision', 'negative_predictive_value',
+        'fdr', 'false_discovery_rate', 'for', 'false_omission_rate',
+        'amean', 'arithmetic_mean', 'gmean', 'geometric_mean', 'gmeasure',
+        'hmean', 'f1s', 'harmonic_mean', 'fmeasure', 'f1score', 'fmeasure_2', 'fbs', 'fbeta',
+        'acc_2', 'accuracy_2', 'jcd', 'jaccard', 'tanimoto_similarity_coefficient',
+        'auc', 'inf', 'informedness', 'mrk', 'markedness']
