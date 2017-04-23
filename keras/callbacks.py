@@ -1017,8 +1017,9 @@ class BinaryLogger(Callback):
                 else:
                     self.totals[k] = logs[k]
             else:
-                raise 'BinaryLogger requires all binary raw binary counts (TP, TN, FP, FN) to be '\
-                    'added to the model metrics: metrics=[...]+BinaryLogger.BinaryRawCounts'
+                raise ValueError('BinaryLogger requires all binary raw binary counts '
+                                 '(TP, TN, FP, FN) to be added to the model metrics: '
+                                 'metrics=[...]+BinaryLogger.BinaryRawCounts')
 
     def on_epoch_end(self, epoch, logs=None):
         if logs is not None:
