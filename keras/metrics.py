@@ -59,6 +59,7 @@ mae = MAE = mean_absolute_error
 mape = MAPE = mean_absolute_percentage_error
 msle = MSLE = mean_squared_logarithmic_error
 cosine = cosine_proximity
+raw_binary_counts = [binary_tp, binary_tn, binary_fp, binary_fn]
 
 
 def serialize(metric):
