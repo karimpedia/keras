@@ -35,6 +35,23 @@ def sparse_categorical_accuracy(y_true, y_pred):
 def top_k_categorical_accuracy(y_true, y_pred, k=5):
     return K.mean(K.in_top_k(y_pred, K.argmax(y_true, axis=-1), k), axis=-1)
 
+
+def binary_tp(y_true, y_pred):
+    return K.mean(K.round(K.clip(y_true * y_pred, 0, 1)))
+
+
+def binary_tn(y_true, y_pred):
+    return K.mean(K.round(K.clip((1.0-y_true) * (1.0-y_pred), 0, 1)))
+
+
+def binary_fp(y_true, y_pred):
+    return K.mean(K.round(K.clip((1.0-y_true) * y_pred, 0, 1)))
+
+
+def binary_fn(y_true, y_pred):
+    return K.mean(K.round(K.clip(y_true * (1.0-y_pred), 0, 1)))
+
+
 # Aliases
 
 mse = MSE = mean_squared_error

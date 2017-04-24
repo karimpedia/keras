@@ -17,7 +17,10 @@ def binary_metrics(binary_tp, binary_tn, binary_fp, binary_fn, beta=1.0):
     _bb = beta ** 2
     _eps = np.finfo(np.float32).eps
 
-    tp, tn, fp, fn = binary_tp, binary_tn, binary_fp, binary_fn
+    tp = true_positives = binary_tp
+    tn = true_negatives = binary_tn
+    fp = false_positives = binary_fp
+    fn = false_negatives = binary_fn
 
     pp = bias = pred_positives = tp + fp
     pn = pred_negatives = tn + fn
@@ -48,4 +51,6 @@ def binary_metrics(binary_tp, binary_tn, binary_fp, binary_fn, beta=1.0):
     informedness = tpr + tnr - 1
     markedness = ppv + npv - 1
 
+
     return {k: v for k, v in locals().items() if not k.startswith('_')}
+
