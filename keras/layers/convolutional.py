@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from __future__ import absolute_import
+import collections
 import functools
 
 from .. import backend as K
@@ -1470,7 +1471,7 @@ class ZeroPadding1D(Layer):
                 raise ValueError('Unexpected key found in `padding` dictionary. '
                                  'Keys have to be in {"left_pad", "right_pad"}. '
                                  'Found: ' + str(padding.keys()))
-        else:
+        elif isinstance(padding, collections.Iterable):
             padding = tuple(padding)
             if len(padding) != 2:
                 raise ValueError('`padding` should be int, or dict with keys '
@@ -1478,6 +1479,10 @@ class ZeroPadding1D(Layer):
                                  'Found: ' + str(padding))
             self.left_pad = padding[0]
             self.right_pad = padding[1]
+        else:
+            raise ValueError('`padding` should be int, or dict with keys '
+                             '{"left_pad", "right_pad"}, or tuple of length 2. '
+                             'Found: ' + str(padding))
         self.input_spec = [InputSpec(ndim=3)]
 
     def get_output_shape_for(self, input_shape):

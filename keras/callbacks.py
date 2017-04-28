@@ -15,6 +15,8 @@ from collections import Iterable
 from .utils.generic_utils import Progbar
 from keras import backend as K
 from pkg_resources import parse_version
+from .metrics import raw_binary_counts as RawBinaryCounts
+from .utils.dpr_utils import binary_metrics
 
 try:
     import requests
@@ -318,7 +320,7 @@ class ModelCheckpoint(Callback):
 
     def __init__(self, filepath, monitor='val_loss', verbose=0,
                  save_best_only=False, save_weights_only=False,
-                 mode='auto', period=1):
+                 mode='auto', period=1, save_last=False):
         super(ModelCheckpoint, self).__init__()
         self.monitor = monitor
         self.verbose = verbose
@@ -326,6 +328,7 @@ class ModelCheckpoint(Callback):
         self.save_best_only = save_best_only
         self.save_weights_only = save_weights_only
         self.period = period
+        self.save_last = save_last
         self.epochs_since_last_save = 0
 
         if mode not in ['auto', 'min', 'max']:
@@ -382,6 +385,12 @@ class ModelCheckpoint(Callback):
                     self.model.save_weights(filepath, overwrite=True)
                 else:
                     self.model.save(filepath, overwrite=True)
+
+    def on_train_end(self, logs={}):
+        if self.save_last:
+            self.model.save(self.filepath.format(epoch=self.params['nb_epoch'], **logs),
+                            overwrite=True)
+
 
 
 class EarlyStopping(Callback):
@@ -928,3 +937,81 @@ class LambdaCallback(Callback):
             self.on_train_end = on_train_end
         else:
             self.on_train_end = lambda logs: None
+
+
+class BinaryLogger(Callback):
+    """Callback that estimates binary metrics.
+    """
+    BinaryMetrics = binary_metrics(0, 0, 0, 0, 0).keys()
+
+    def __init__(self, metrics=['recall', 'precision', 'fmeasure'], beta=1.0):
+        self.metrics = metrics
+        self.beta = beta
+
+    def on_epoch_end(self, epoch, logs=None):
+        bc_names = [x.__name__ for x in RawBinaryCounts]
+        trn_metrics = {x: logs[x] for x in bc_names}
+        trn_metrics = binary_metrics(**trn_metrics)
+        for x in self.metrics:
+            logs[x] = trn_metrics[x]
+
+        if self.model.validation_data:
+            vld_metrics = {x: logs['val_' + x] for x in bc_names}
+            vld_metrics = binary_metrics(**vld_metrics)
+            for x in self.metrics:
+                logs['val_' + x] = vld_metrics[x]
+
+
+class CMDProgress(Callback):
+    '''A Callback that pretty-prints metrics to the command line
+    Each metric consists of three elements:
+        - Its name in the model.metrics list
+        - Its label to be printed to the command line
+        - Its value-format to be printed to the command line
+    '''
+
+    def __init__(self, cmd_elements={'loss': {'lbl': 'L', 'frmt': '.5E'}}):
+        self.epcStr = 'Epoch {cEpc:0{zPad}d}/{nEpc:{zPad}d}: '\
+            '{epcTF:.2f} seconds ({epcTC:.2f} seconds) '\
+            '[LR: {lr:01.10e}]'
+        self.cmd_elements = cmd_elements
+
+    def on_train_begin(self, logs={}):
+        self.trnStartTime = time.time()
+        self.epcEndTime = time.time()
+
+    def on_epoch_begin(self, epoch, logs={}):
+        self.epcStartTime = time.time()
+
+    def on_epoch_end(self, epoch, logs={}):
+        epcEndTime = time.time()
+        coarseEpochTime = epcEndTime - self.epcEndTime
+        fineEpochTime = epcEndTime - self.epcStartTime
+        self.epcEndTime = epcEndTime
+        learning_rate = logs['lr'] if 'lr' in logs.keys() else K.get_value(self.model.optimizer.lr)
+        self.trnStr = 'trn) '
+        for k, v in self.cmd_elements.items():
+            if k in logs.keys():
+                self.trnStr += \
+                    '{lbl}:{{{valK}:{frmt}}}, '.format(lbl=v['lbl'], valK=k, frmt=v['frmt'])
+        self.trnStr = self.trnStr[:-2]
+        self.vldStr = 'vld) '
+        for k, v in self.cmd_elements.items():
+            if ('val_'+k) in logs.keys():
+                self.vldStr += \
+                    '{lbl}:{{{valK}:{frmt}}}, '.format(lbl=v['lbl'], valK='val_'+k, frmt=v['frmt'])
+        self.vldStr = self.vldStr[:-2]
+        print('\n'.join((self.epcStr.format(zPad=len(str(self.params['nb_epoch'])),
+                                            cEpc=(epoch + 1), nEpc=self.params['nb_epoch'],
+                                            epcTF=fineEpochTime,
+                                            epcTC=coarseEpochTime,
+                                            lr=learning_rate),
+                         self.trnStr.format(**logs),
+                         self.vldStr.format(**logs))))
+
+    def on_train_end(self, logs={}):
+        self.trnEndTime = time.time()
+        trnT = self.trnEndTime - self.trnStartTime
+        print('Total elapsed time: {} seconds'.format(trnT))
+        print('..................: {} minutes'.format(round(trnT / 60.0)))
+        print('..................: {:.2f} hours'.format(trnT / 3600.0))

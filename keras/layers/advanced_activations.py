@@ -4,6 +4,48 @@ from .. import backend as K
 import numpy as np
 
 
+class RandomReLU(Layer):
+    """Random Leaky version of a Rectified Linear Unit.
+
+    It allows a small gradient when the unit is not active:
+    `f(x) = alpha * x for x < 0`,
+    `f(x) = x for x >= 0`.
+    Where alpha is a random variable drawn from the given alpha_tensor
+
+    # Input shape
+        Arbitrary. Use the keyword argument `input_shape`
+        (tuple of integers, does not include the samples axis)
+        when using this layer as the first layer in a model.
+
+    # Output shape
+        Same shape as the input.
+
+    # Arguments
+        alpha_tensor: A random tensor from which the Negative slope
+            coefficient alpha is to be drawn.
+            Note: the tensor [MUST] produce only positive values.
+
+    # References
+        - [Rectifier Nonlinearities Improve Neural Network Acoustic Models](https://web.stanford.edu/~awni/papers/relu_hybrid_icml2013_final.pdf)
+    """
+
+    def __init__(self, alpha_tensor=K.random_uniform((1,), low=0.1, high=1.3,),
+                 in_phase=['training'], **kwargs):
+        self.supports_masking = True
+        self.uses_learning_phase = True
+        self.alpha_tensor = alpha_tensor
+        self.in_phase = in_phase
+        super(RandomReLU, self).__init__(**kwargs)
+
+    def call(self, x, mask=None):
+        return K.relu(x, alpha=self.alpha)
+
+    def get_config(self):
+        config = {'alpha': self.alpha}
+        base_config = super(LeakyReLU, self).get_config()
+        return dict(list(base_config.items()) + list(config.items()))
+
+
 class LeakyReLU(Layer):
     """Leaky version of a Rectified Linear Unit.
 

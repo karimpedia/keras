@@ -171,6 +171,22 @@ def fmeasure(y_true, y_pred):
     return fbeta_score(y_true, y_pred, beta=1)
 
 
+def binary_tp(y_true, y_pred):
+    return K.mean(K.round(K.clip(y_true * y_pred, 0, 1)))
+
+
+def binary_tn(y_true, y_pred):
+    return K.mean(K.round(K.clip((1.0-y_true) * (1.0-y_pred), 0, 1)))
+
+
+def binary_fp(y_true, y_pred):
+    return K.mean(K.round(K.clip((1.0-y_true) * y_pred, 0, 1)))
+
+
+def binary_fn(y_true, y_pred):
+    return K.mean(K.round(K.clip(y_true * (1.0-y_pred), 0, 1)))
+
+
 # aliases
 mse = MSE = mean_squared_error
 mae = MAE = mean_absolute_error
@@ -178,6 +194,7 @@ mape = MAPE = mean_absolute_percentage_error
 msle = MSLE = mean_squared_logarithmic_error
 cosine = cosine_proximity
 fscore = f1score = fmeasure
+raw_binary_counts = [binary_tp, binary_tn, binary_fp, binary_fn]
 
 
 def get(identifier):
