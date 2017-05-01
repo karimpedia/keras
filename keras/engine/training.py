@@ -685,6 +685,8 @@ class Model(Container):
                 See [losses](/losses).
                 If the model has multiple outputs, you can use a different loss
                 on each output by passing a dictionary or a list of losses.
+                The loss value that will be minimized by the model
+                will then be the sum of all individual losses.
             metrics: list of metrics to be evaluated by the model
                 during training and testing.
                 Typically you will use `metrics=['accuracy']`.
@@ -694,6 +696,9 @@ class Model(Container):
             loss_weights: Optional list or dictionary specifying scalar
                 coefficients (Python floats) to weight the loss contributions
                 of different model outputs.
+                The loss value that will be minimized by the model
+                will then be the *weighted sum* of all individual losses,
+                weighted by the `loss_weights` coefficients.
                 If a list, it is expected to have a 1:1 mapping
                 to the model's outputs. If a tensor, it is expected to map
                 output names (strings) to scalar coefficients.
@@ -1365,7 +1370,7 @@ class Model(Container):
             batch_size: integer. Number of samples per gradient update.
             epochs: integer, the number of times to iterate
                 over the training data arrays.
-                verbose: 0, 1, or 2. Verbosity mode.
+            verbose: 0, 1, or 2. Verbosity mode.
                 0 = silent, 1 = verbose, 2 = one log line per epoch.
             callbacks: list of callbacks to be called during training.
                 See [callbacks](/callbacks).
@@ -1939,7 +1944,7 @@ class Model(Container):
         The generator should return the same kind of data
         as accepted by `test_on_batch`.
 
-        Arguments:
+        # Arguments
             generator: Generator yielding tuples (inputs, targets)
                 or (inputs, targets, sample_weights)
             steps: Total number of steps (batches of samples)
