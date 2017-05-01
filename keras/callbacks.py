@@ -987,11 +987,11 @@ class GetHistoryCallback(Callback):
         for k, v in logs.items():
             self.history.setdefault(k, []).append(v)
         if (epoch + 1) % self.period == 0:
-            self.func(history=self.history)
+            self.func(self.history)
 
     def on_train_end(self, logs={}):
         if self.last:
-            self.func(history=self.history)
+            self.func(self.history)
 
 
 class CMDProgress(Callback):
