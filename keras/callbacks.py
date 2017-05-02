@@ -417,7 +417,7 @@ class ModelCheckpoint(Callback):
 
     def on_train_end(self, logs={}):
         if self.save_last:
-            self.model.save(self.dir_path)
+            self.model.save(self.filepath)
 
 
 
