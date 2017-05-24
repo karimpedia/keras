@@ -459,6 +459,7 @@ class EarlyStopping(Callback):
         if self.monitor_op(current - self.min_delta, self.best):
             self.best = current
             self.wait = 0
+            self.stopped_epoch = 0
         else:
             if self.wait >= self.patience:
                 self.stopped_epoch = epoch
@@ -468,6 +469,33 @@ class EarlyStopping(Callback):
     def on_train_end(self, logs=None):
         if self.stopped_epoch > 0 and self.verbose > 0:
             print('Epoch %05d: early stopping' % (self.stopped_epoch))
+
+
+class OverfittingNotifier(EarlyStopping):
+    """Notify (in stdout) during training when a monitored quantity
+    has stopped improving.
+    See: EarlyStopping
+    """
+
+    def __init__(self, monitor='val_loss', min_delta=0, patience=0, mode='auto', **kwargs):
+        super(OverfittingNotifier, self).__init__(monitor=monitor, min_delta=min_delta,
+                                                  patience=patience, mode=mode, **kwargs)
+
+    def on_train_begin(self, **kwargs):
+        super(OverfittingNotifier, self).on_train_begin(**kwargs)
+
+    def on_epoch_end(self, epoch, **kwargs):
+        super(OverfittingNotifier, self).on_epoch_end(epoch=epoch, **kwargs)
+        self.model.stop_training = False
+        if self.stopped_epoch > 0:
+            print('OverfittingClb) Epoch {cEpc:05d}/{bEpc:05d}/{tEpc:05d}: monitored quantity'
+                  'has not improved for {dEpc:05d} epochs'.format(cEpc=epoch,
+                                                                  bEpc=self.best,
+                                                                  tEpc=self.params['nb_epoch'],
+                                                                  dEpc=epoch-self.best))
+
+    def on_train_end(self, logs=None):
+        pass
 
 
 class RemoteMonitor(Callback):
