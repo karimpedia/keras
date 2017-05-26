@@ -43,7 +43,7 @@ def layer_from_config(config, custom_objects=None):
 
 
 def print_summary(layers, relevant_nodes=None,
-                  line_length=100, positions=None):
+                  line_length=115, positions=None):
     """Prints a summary of a layer.
 
     # Arguments
@@ -122,6 +122,93 @@ def print_summary(layers, relevant_nodes=None,
     print('Trainable params: {:,}'.format(trainable_count))
     print('Non-trainable params: {:,}'.format(non_trainable_count))
     print('_' * line_length)
+
+
+def parse_summary(layers, relevant_nodes=None,
+                  line_length=115, positions=None):
+    """Prints a summary of a layer.
+
+    # Arguments
+        layers: list of layers to print summaries of
+        relevant_nodes: list of relevant nodes
+        line_length: total length of printed lines
+        positions: relative or absolute positions of log elements in each line.
+            If not provided, defaults to `[.33, .55, .67, 1.]`.
+    """
+    full_string = ''
+
+    positions = positions or [.33, .55, .67, 1.]
+    if positions[-1] <= 1:
+        positions = [int(line_length * p) for p in positions]
+    # header names for the different log elements
+    to_display = ['Layer (type)', 'Output Shape', 'Param #', 'Connected to']
+
+    def parse_row(fields, positions):
+        line = ''
+        for i in range(len(fields)):
+            if i > 0:
+                line = line[:-1] + ' '
+            line += str(fields[i])
+            line = line[:positions[i]]
+            line += ' ' * (positions[i] - len(line))
+        return line + '\r\n'
+
+    full_string += '_' * line_length + '\r\n'
+    full_string += parse_row(to_display, positions)
+    full_string += '=' * line_length + '\r\n'
+
+    def parse_layer_summary(layer):
+        """Prints a summary for a single layer.
+
+        # Arguments
+            layer: target layer.
+        """
+        try:
+            output_shape = layer.output_shape
+        except AttributeError:
+            output_shape = 'multiple'
+        connections = []
+        for node_index, node in enumerate(layer.inbound_nodes):
+            if relevant_nodes:
+                node_key = layer.name + '_ib-' + str(node_index)
+                if node_key not in relevant_nodes:
+                    # node is node part of the current network
+                    continue
+            for i in range(len(node.inbound_layers)):
+                inbound_layer = node.inbound_layers[i].name
+                inbound_node_index = node.node_indices[i]
+                inbound_tensor_index = node.tensor_indices[i]
+                connections.append(
+                    inbound_layer + '[' + str(inbound_node_index) + '][' + str(inbound_tensor_index) + ']')
+
+        name = layer.name
+        cls_name = layer.__class__.__name__
+        if not connections:
+            first_connection = ''
+        else:
+            first_connection = connections[0]
+        fields = [name + ' (' + cls_name + ')', output_shape, layer.count_params(), first_connection]
+        sub_string = parse_row(fields, positions)
+        if len(connections) > 1:
+            for i in range(1, len(connections)):
+                fields = ['', '', '', connections[i]]
+                sub_string += parse_row(fields, positions)
+        return sub_string
+
+    for i in range(len(layers)):
+        full_string += parse_layer_summary(layers[i])
+        if i == len(layers) - 1:
+            full_string += '=' * line_length + '\r\n'
+        else:
+            full_string += '_' * line_length + '\r\n'
+
+    trainable_count, non_trainable_count = count_total_params(layers, layer_set=None)
+
+    full_string += 'Total params: {:,}'.format(trainable_count + non_trainable_count) + '\r\n'
+    full_string += 'Trainable params: {:,}'.format(trainable_count) + '\r\n'
+    full_string += 'Non-trainable params: {:,}'.format(non_trainable_count) + '\r\n'
+    full_string += '_' * line_length + '\r\n'
+    return full_string
 
 
 def count_total_params(layers, layer_set=None):

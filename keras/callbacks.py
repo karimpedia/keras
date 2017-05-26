@@ -195,6 +195,13 @@ class Callback(object):
     def on_train_end(self, logs=None):
         pass
 
+    def get_config(self):
+        return self.config if hasattr(self, 'config') else {}
+
+    @classmethod
+    def from_config(cls, config):
+        return cls(**config)
+
 
 class BaseLogger(Callback):
     """Callback that accumulates epoch averages of metrics.
@@ -322,13 +329,17 @@ class ModelCheckpoint(Callback):
                  save_best_only=False, save_weights_only=False,
                  mode='auto', period=1, save_last=False):
         super(ModelCheckpoint, self).__init__()
+        self.filepath = filepath
         self.monitor = monitor
         self.verbose = verbose
-        self.filepath = filepath
         self.save_best_only = save_best_only
         self.save_weights_only = save_weights_only
         self.period = period
         self.save_last = save_last
+        _lcl = locals()
+        self.config = {k: _lcl[k] for k in ['monitor', 'verbose', 'save_best_only', 'save_weights_only', 'mode',
+                                            'period', 'save_last']}
+
         self.epochs_since_last_save = 0
 
         if mode not in ['auto', 'min', 'max']:
@@ -392,7 +403,6 @@ class ModelCheckpoint(Callback):
                             overwrite=True)
 
 
-
 class EarlyStopping(Callback):
     """Stop training when a monitored quantity has stopped improving.
 
@@ -414,15 +424,18 @@ class EarlyStopping(Callback):
             from the name of the monitored quantity.
     """
 
-    def __init__(self, monitor='val_loss',
-                 min_delta=0, patience=0, verbose=0, mode='auto'):
+    def __init__(self, monitor='val_loss', min_delta=0, patience=0, verbose=0, mode='auto'):
         super(EarlyStopping, self).__init__()
 
         self.monitor = monitor
+        self.min_delta = min_delta
         self.patience = patience
         self.verbose = verbose
-        self.min_delta = min_delta
+        _lcl = locals()
+        self.config = {k: _lcl[k] for k in ['monitor', 'min_delta', 'patience', 'verbose', 'mode']}
+
         self.wait = 0
+        self.best_epoch = 0
         self.stopped_epoch = 0
 
         if mode not in ['auto', 'min', 'max']:
@@ -457,6 +470,7 @@ class EarlyStopping(Callback):
                           (self.monitor), RuntimeWarning)
 
         if self.monitor_op(current - self.min_delta, self.best):
+            self.best_epoch = epoch
             self.best = current
             self.wait = 0
             self.stopped_epoch = 0
@@ -480,19 +494,19 @@ class OverfittingNotifier(EarlyStopping):
     def __init__(self, monitor='val_loss', min_delta=0, patience=0, mode='auto', **kwargs):
         super(OverfittingNotifier, self).__init__(monitor=monitor, min_delta=min_delta,
                                                   patience=patience, mode=mode, **kwargs)
+        _lcl = locals()
+        self.config = {k: _lcl[k] for k in ['monitor', 'min_delta', 'patience', 'mode']}
 
-    def on_train_begin(self, **kwargs):
-        super(OverfittingNotifier, self).on_train_begin(**kwargs)
+    def on_train_begin(self, logs=None):
+        super(OverfittingNotifier, self).on_train_begin(logs)
 
-    def on_epoch_end(self, epoch, **kwargs):
-        super(OverfittingNotifier, self).on_epoch_end(epoch=epoch, **kwargs)
+    def on_epoch_end(self, epoch, logs=None):
+        super(OverfittingNotifier, self).on_epoch_end(epoch, logs)
         self.model.stop_training = False
         if self.stopped_epoch > 0:
-            print('OverfittingClb) Epoch {cEpc:05d}/{bEpc:05d}/{tEpc:05d}: monitored quantity'
-                  'has not improved for {dEpc:05d} epochs'.format(cEpc=epoch,
-                                                                  bEpc=self.best,
-                                                                  tEpc=self.params['nb_epoch'],
-                                                                  dEpc=epoch-self.best))
+            print('OverfittingClb) Epoch {epoch:05d}/{self.best_epoch:05d}/{tEpc:05d}: monitored quantity '
+                  'hasn''t improved for {dEpc:05d} epochs (best value: {self.best}) [{self.monitor}]'.format(
+                      tEpc=self.params['nb_epoch'], dEpc=epoch-self.best_epoch, **locals()))
 
     def on_train_end(self, logs=None):
         pass
@@ -529,6 +543,8 @@ class RemoteMonitor(Callback):
         self.path = path
         self.field = field
         self.headers = headers
+        _lcl = locals()
+        self.config = {k: _lcl[k] for k in ['root', 'path', 'field', 'headers']}
 
     def on_epoch_end(self, epoch, logs=None):
         if requests is None:
@@ -560,6 +576,8 @@ class LearningRateScheduler(Callback):
     def __init__(self, schedule):
         super(LearningRateScheduler, self).__init__()
         self.schedule = schedule
+        _lcl = locals()
+        self.config = {k: _lcl[k] for k in ['schedule']}
 
     def on_epoch_begin(self, epoch, logs=None):
         if not hasattr(self.model.optimizer, 'lr'):
@@ -613,6 +631,10 @@ class TensorBoard(Callback):
         self.merged = None
         self.write_graph = write_graph
         self.write_images = write_images
+        _lcl = locals()
+        self.config = {k: _lcl[k] for k in ['log_dir', 'histogram_freq', 'write_graph', 'write_graph',
+                                            'write_images']}
+
 
     def set_model(self, model):
         self.model = model
@@ -744,6 +766,9 @@ class ReduceLROnPlateau(Callback):
     def __init__(self, monitor='val_loss', factor=0.1, patience=10,
                  verbose=0, mode='auto', epsilon=1e-4, cooldown=0, min_lr=0):
         super(ReduceLROnPlateau, self).__init__()
+        _lcl = locals()
+        self.config = {k: _lcl[k] for k in ['monitor', 'factor', 'patience', 'verbose',
+                                            'mode', 'epsilon', 'cooldown', 'min_lr']}
 
         self.monitor = monitor
         if factor >= 1.0:
@@ -843,6 +868,9 @@ class CSVLogger(Callback):
         self.keys = None
         self.append_header = True
         super(CSVLogger, self).__init__()
+        _lcl = locals()
+        self.config = {k: _lcl[k] for k in ['filename', 'separator', 'append']}
+
 
     def on_train_begin(self, logs=None):
         if self.append:
@@ -972,9 +1000,11 @@ class BinaryLogger(Callback):
     """
     BinaryMetrics = binary_metrics(0, 0, 0, 0, 0).keys()
 
-    def __init__(self, metrics=['recall', 'precision', 'fmeasure'], beta=1.0):
+    def __init__(self, metrics=['tpr', 'ppv', 'f1s'], beta=1.0):
         self.metrics = metrics
         self.beta = beta
+        _lcl = locals()
+        self.config = {k: _lcl[k] for k in ['metrics', 'beta']}
 
     def on_epoch_end(self, epoch, logs=None):
         bc_names = [x.__name__ for x in RawBinaryCounts]
@@ -993,10 +1023,13 @@ class BinaryLogger(Callback):
 class GetHistoryCallback(Callback):
     '''A Callback that periodically gives training history (as a dict) to a given function
     '''
-    def __init__(self, func, period, last=True):
+    def __init__(self, func, period, save_last=True):
         self.func = func
         self.period = period
-        self.last = last
+        self.save_last = save_last
+        # TODO: func can be any function or method
+        _lcl = locals()
+        self.config = {k: _lcl[k] for k in ['func', 'period', 'save_last']}
 
     def on_train_begin(self, logs={}):
         self.epoch = []
@@ -1018,7 +1051,7 @@ class GetHistoryCallback(Callback):
             self.func(self.history)
 
     def on_train_end(self, logs={}):
-        if self.last:
+        if self.save_last:
             self.func(self.history)
 
 
@@ -1030,11 +1063,37 @@ class CMDProgress(Callback):
         - Its value-format to be printed to the command line
     '''
 
-    def __init__(self, cmd_elements={'loss': {'lbl': 'L', 'frmt': '.5E'}}):
+    CMDMetricsStr = OrderedDict()
+    CMDMetricsStr['loss'] = {'lbl': 'L', 'frmt': '.5E'}
+    CMDMetricsStr['binary_crossentropy'] = {'lbl': 'bCE', 'frmt': '011.7f'}
+    CMDMetricsStr['binary_accuracy'] = {'lbl': 'ACC', 'frmt': '010.8f'}
+    CMDMetricsStr['f1s'] = {'lbl': '|F1S', 'frmt': '010.8f'}
+    CMDMetricsStr['ppv'] = {'lbl': '|PPV', 'frmt': '010.8f'}
+    CMDMetricsStr['tpr'] = {'lbl': '|TPR', 'frmt': '010.8f'}
+    CMDMetricsStr['tnr'] = {'lbl': '|TNR', 'frmt': '010.8f'}
+    CMDMetricsStr['fpr'] = {'lbl': '|FPR', 'frmt': '010.8f'}
+    CMDMetricsStr['fnr'] = {'lbl': '|FNR', 'frmt': '010.8f'}
+
+    CMDMetricsStr['mean_absolute_error'] = {'lbl': 'MAE', 'frmt': '011.7f'}
+    CMDMetricsStr['mae'] = {'lbl': 'MAE', 'frmt': '011.7f'}
+    CMDMetricsStr['mean_absolute_percentage_error'] = {'lbl': 'MAPE', 'frmt': '011.7f'}
+    CMDMetricsStr['mape'] = {'lbl': 'MAPE', 'frmt': '011.7f'}
+
+    CMDMetricsStr['mean_squared_error'] = {'lbl': 'MSE', 'frmt': '011.7f'}
+    CMDMetricsStr['mse'] = {'lbl': 'MSE', 'frmt': '011.7f'}
+    CMDMetricsStr['mean_squared_logarithmic_error'] = {'lbl': 'MSLE', 'frmt': '011.7f'}
+    CMDMetricsStr['msle'] = {'lbl': 'MSLE', 'frmt': '011.7f'}
+
+    CMDMetricsStr['tpr_fnr'] = {'lbl': 'TPR+FNR=1', 'frmt': '010.8f'}
+    CMDMetricsStr['tnr_fpr'] = {'lbl': 'TnR+FPR=1', 'frmt': '010.8f'}
+
+    def __init__(self, cmd_elements=CMDMetricsStr):
         self.epcStr = 'Epoch {cEpc:0{zPad}d}/{nEpc:{zPad}d}: '\
             '{epcTF:.2f} seconds ({epcTC:.2f} seconds) '\
             '[LR: {lr:01.10e}]'
         self.cmd_elements = cmd_elements
+        _lcl = locals()
+        self.config = {k: _lcl[k] for k in ['cmd_elements']}
 
     def on_train_begin(self, logs={}):
         self.trnStartTime = time.time()
@@ -1048,6 +1107,7 @@ class CMDProgress(Callback):
         coarseEpochTime = epcEndTime - self.epcEndTime
         fineEpochTime = epcEndTime - self.epcStartTime
         self.epcEndTime = epcEndTime
+        #TODO
         learning_rate = logs['lr'] if 'lr' in logs.keys() else K.get_value(self.model.optimizer.lr)
         self.trnStr = 'trn) '
         for k, v in self.cmd_elements.items():
