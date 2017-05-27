@@ -396,6 +396,41 @@ def standardize_weights(y, sample_weight=None, class_weight=None,
             return np.ones((y.shape[0], y.shape[1]), dtype=K.floatx())
 
 
+def _masked_objective(fn):
+    """Adds support for masking to an objective function.
+    It transforms an objective function `fn(y_true, y_pred)`
+    into a cost-masked objective function
+    `fn(y_true, y_pred, mask)`.
+    # Arguments
+        fn: The objective function to wrap,
+            with signature `fn(y_true, y_pred)`.
+    # Returns
+        A function with signature `fn(y_true, y_pred, mask)`.
+    """
+    def masked(y_true, y_pred, mask=None):
+        """Wrapper function.
+        # Arguments
+            y_true: `y_true` argument of `fn`.
+            y_pred: `y_pred` argument of `fn`.
+            mask: Mask tensor.
+        # Returns
+            Scalar tensor.
+        """
+        # score_array has ndim >= 2
+        score_array = fn(y_true, y_pred)
+        if mask is not None:
+            # Cast the mask to floatX to avoid float64 upcasting in theano
+            mask = K.cast(mask, K.floatx())
+            # mask should have the same shape as score_array
+            score_array *= mask
+            #  the loss per batch should be proportional
+            #  to the number of unmasked samples.
+            score_array /= K.mean(mask)
+
+        return K.mean(score_array)
+    return masked
+
+
 class GeneratorEnqueuer(object):
     """Builds a queue out of a data generator.
     Used in `fit_generator`, `evaluate_generator`, `predict_generator`.
@@ -690,7 +725,40 @@ class Model(Container):
             self.metrics_names.append(metric_name)
             self.metrics_tensors.append(metric_tensor)
 
+#        for i in range(len(self.outputs)):
+#            y_true = self.targets[i]
+#            y_pred = self.outputs[i]
+#            output_metrics = nested_metrics[i]
+#
+#            for metric in output_metrics:
+#                if metric == 'accuracy' or metric == 'acc':
+#                    # custom handling of accuracy
+#                    # (because of class mode duality)
+#                    output_shape = self.internal_output_shapes[i]
+#                    acc_fn = None
+#                    if output_shape[-1] == 1 or self.loss_functions[i] == objectives.binary_crossentropy:
+#                        # case: binary accuracy
+#                        acc_fn = metrics_module.binary_accuracy
+#                    elif self.loss_functions[i] == objectives.sparse_categorical_crossentropy:
+#                        # case: categorical accuracy with sparse targets
+#                        acc_fn = metrics_module.sparse_categorical_accuracy
+#                    else:
+#                        acc_fn = metrics_module.categorical_accuracy
+#
+#                    append_metric(i, 'acc', acc_fn(y_true, y_pred))
+#                else:
+#                    metric_fn = metrics_module.get(metric)
+#                    metric_result = metric_fn(y_true, y_pred)
+#
+#                    if not isinstance(metric_result, dict):
+#                        metric_result = {
+#                            metric_fn.__name__: metric_result
+#                        }
+#
+#                    for name, tensor in six.iteritems(metric_result):
+#                        append_metric(i, name, tensor)
         for i in range(len(self.outputs)):
+
             y_true = self.targets[i]
             y_pred = self.outputs[i]
             output_metrics = nested_metrics[i]
@@ -701,7 +769,8 @@ class Model(Container):
                     # (because of class mode duality)
                     output_shape = self.internal_output_shapes[i]
                     acc_fn = None
-                    if output_shape[-1] == 1 or self.loss_functions[i] == objectives.binary_crossentropy:
+                    if (output_shape[-1] == 1) or \
+                       (self.loss_functions[i] == objectives.binary_crossentropy):
                         # case: binary accuracy
                         acc_fn = metrics_module.binary_accuracy
                     elif self.loss_functions[i] == objectives.sparse_categorical_crossentropy:
@@ -710,10 +779,14 @@ class Model(Container):
                     else:
                         acc_fn = metrics_module.categorical_accuracy
 
-                    append_metric(i, 'acc', acc_fn(y_true, y_pred))
+                    # TODO: FIX MASK
+                    masked_fn = _masked_objective(acc_fn)
+                    append_metric(i, 'acc', masked_fn(y_true, y_pred, mask=None))
                 else:
+                    # TODO: FIX MASK
                     metric_fn = metrics_module.get(metric)
-                    metric_result = metric_fn(y_true, y_pred)
+                    masked_metric_fn = _masked_objective(metric_fn)
+                    metric_result = masked_metric_fn(y_true, y_pred, mask=None)
 
                     if not isinstance(metric_result, dict):
                         metric_result = {
@@ -721,7 +794,13 @@ class Model(Container):
                         }
 
                     for name, tensor in six.iteritems(metric_result):
-                        append_metric(i, name, tensor)
+                        append_metric(i, name, tensor)#
+
+
+
+
+
+
 
         # prepare gradient updates and state updates
         self.total_loss = total_loss
