@@ -392,7 +392,7 @@ class Convolution2D(Layer):
                  W_regularizer=None, b_regularizer=None,
                  activity_regularizer=None,
                  W_constraint=None, b_constraint=None,
-                 bias=True, **kwargs):
+                 bias=True, dilation_rate=None, **kwargs):
         if dim_ordering == 'default':
             dim_ordering = K.image_dim_ordering()
         if border_mode not in {'valid', 'same', 'full'}:
@@ -416,6 +416,9 @@ class Convolution2D(Layer):
         self.b_constraint = constraints.get(b_constraint)
 
         self.bias = bias
+        self.dilation_rate = dilation_rate
+
+
         self.input_spec = [InputSpec(ndim=4)]
         self.initial_weights = weights
         super(Convolution2D, self).__init__(**kwargs)
@@ -473,7 +476,8 @@ class Convolution2D(Layer):
         output = K.conv2d(x, self.W, strides=self.subsample,
                           border_mode=self.border_mode,
                           dim_ordering=self.dim_ordering,
-                          filter_shape=self.W_shape)
+                          filter_shape=self.W_shape,
+                          dilation_rate=self.dilation_rate)
         if self.bias:
             if self.dim_ordering == 'th':
                 output += K.reshape(self.b, (1, self.nb_filter, 1, 1))
@@ -498,7 +502,8 @@ class Convolution2D(Layer):
                   'activity_regularizer': self.activity_regularizer.get_config() if self.activity_regularizer else None,
                   'W_constraint': self.W_constraint.get_config() if self.W_constraint else None,
                   'b_constraint': self.b_constraint.get_config() if self.b_constraint else None,
-                  'bias': self.bias}
+                  'bias': self.bias,
+                  'dilation_rate': self.dilation_rate}
         base_config = super(Convolution2D, self).get_config()
         return dict(list(base_config.items()) + list(config.items()))
 

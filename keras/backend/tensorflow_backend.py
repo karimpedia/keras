@@ -2661,10 +2661,11 @@ def conv1d(x, kernel, stride=1, border_mode='valid',
 
 def conv2d(x, kernel, strides=(1, 1), border_mode='valid',
            dim_ordering='default',
-           image_shape=None, filter_shape=None, filter_dilation=(1, 1)):
+           image_shape=None, filter_shape=None, filter_dilation=(1, 1), dilation_rate=(1, 1)):
     """2D convolution.
 
     # Arguments
+        x: Tensor or variable.
         kernel: kernel tensor.
         strides: strides tuple.
         border_mode: string, `"same"` or `"valid"`.
@@ -2686,13 +2687,25 @@ def conv2d(x, kernel, strides=(1, 1), border_mode='valid',
     x = _preprocess_conv2d_input(x, dim_ordering)
     kernel = _preprocess_conv2d_kernel(kernel, dim_ordering)
     padding = _preprocess_border_mode(border_mode)
-    if filter_dilation == (1, 1):
-        strides = (1,) + strides + (1,)
-        x = tf.nn.conv2d(x, kernel, strides, padding=padding)
-    else:
-        assert filter_dilation[0] == filter_dilation[1]
-        assert strides == (1, 1), 'Invalid strides for dilated convolution'
-        x = tf.nn.atrous_conv2d(x, kernel, filter_dilation[0], padding=padding)
+
+    #FIXME:
+    print('Dilation ... {}'.format(dilation_rate))
+
+    x = tf.nn.convolution(input=x,
+                          filter=kernel,
+                          dilation_rate=dilation_rate,
+                          strides=strides,
+                          padding=padding,
+                          data_format='NHWC')
+
+#    if filter_dilation == (1, 1):
+#        strides = (1,) + strides + (1,)
+#        x = tf.nn.conv2d(x, kernel, strides, padding=padding)
+#    else:
+#        assert filter_dilation[0] == filter_dilation[1]
+#        assert strides == (1, 1), 'Invalid strides for dilated convolution'
+#        x = tf.nn.atrous_conv2d(x, kernel, filter_dilation[0], padding=padding)
+
     return _postprocess_conv2d_output(x, dim_ordering)
 
 

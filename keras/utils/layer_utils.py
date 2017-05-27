@@ -207,7 +207,7 @@ def parse_summary(layers, relevant_nodes=None,
     full_string += 'Total params: {:,}'.format(trainable_count + non_trainable_count) + '\r\n'
     full_string += 'Trainable params: {:,}'.format(trainable_count) + '\r\n'
     full_string += 'Non-trainable params: {:,}'.format(non_trainable_count) + '\r\n'
-    full_string += '_' * line_length + '\r\n'
+    full_string += '_' * line_length
     return full_string
 
 
