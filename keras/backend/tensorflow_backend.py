@@ -2688,9 +2688,6 @@ def conv2d(x, kernel, strides=(1, 1), border_mode='valid',
     kernel = _preprocess_conv2d_kernel(kernel, dim_ordering)
     padding = _preprocess_border_mode(border_mode)
 
-    #FIXME:
-    print('Dilation ... {}'.format(dilation_rate))
-
     x = tf.nn.convolution(input=x,
                           filter=kernel,
                           dilation_rate=dilation_rate,
