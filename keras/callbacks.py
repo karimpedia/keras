@@ -327,7 +327,8 @@ class ModelCheckpoint(Callback):
 
     def __init__(self, filepath, monitor='val_loss', verbose=0,
                  save_best_only=False, save_weights_only=False,
-                 mode='auto', period=1, save_last=False):
+                 mode='auto', period=1, save_last=False,
+                 aux_model=None, aux_patience=0):
         super(ModelCheckpoint, self).__init__()
         self.filepath = filepath
         self.monitor = monitor
@@ -336,6 +337,8 @@ class ModelCheckpoint(Callback):
         self.save_weights_only = save_weights_only
         self.period = period
         self.save_last = save_last
+        self.aux_model = aux_model
+        self.aux_patience = aux_patience
         _lcl = locals()
         self.config = {k: _lcl[k] for k in ['monitor', 'verbose', 'save_best_only', 'save_weights_only', 'mode',
                                             'period', 'save_last']}
@@ -361,8 +364,21 @@ class ModelCheckpoint(Callback):
             else:
                 self.monitor_op = np.less
                 self.best = np.Inf
+        self.aux_count = -1
 
     def on_epoch_end(self, epoch, logs=None):
+
+        if self.aux_count >= 0:
+            self.aux_count = self.aux_count + 1
+            if self.aux_count >= self.aux_patience:
+                filepath = self.filepath.format(epoch=epoch, **logs)
+                print(('-'*150) + '> Saving the Auxialiry model')
+                if self.save_weights_only:
+                    self.aux_model.save_weights(filepath, overwrite=True)
+                else:
+                    self.aux_model.save(filepath, overwrite=True)
+                self.aux_count = -1
+
         logs = logs or {}
         self.epochs_since_last_save += 1
         if self.epochs_since_last_save >= self.period:
@@ -381,10 +397,15 @@ class ModelCheckpoint(Callback):
                                   % (epoch, self.monitor, self.best,
                                      current, filepath))
                         self.best = current
-                        if self.save_weights_only:
-                            self.model.save_weights(filepath, overwrite=True)
+                        if self.aux_model is not None and self.aux_patience > 0:
+                            print(('-'*150) + '> Updating the Auxialiry model')
+                            self.aux_model.set_weights(self.model.get_weights())
+                            self.aux_count = 0
                         else:
-                            self.model.save(filepath, overwrite=True)
+                            if self.save_weights_only:
+                                self.model.save_weights(filepath, overwrite=True)
+                            else:
+                                self.model.save(filepath, overwrite=True)
                     else:
                         if self.verbose > 0:
                             print('Epoch %05d: %s did not improve' %
