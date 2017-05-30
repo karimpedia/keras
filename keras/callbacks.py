@@ -372,7 +372,6 @@ class ModelCheckpoint(Callback):
             self.aux_count = self.aux_count + 1
             if self.aux_count >= self.aux_patience:
                 filepath = self.filepath.format(epoch=epoch, **logs)
-                print(('-'*150) + '> Saving the Auxialiry model')
                 if self.save_weights_only:
                     self.aux_model.save_weights(filepath, overwrite=True)
                 else:
@@ -398,7 +397,6 @@ class ModelCheckpoint(Callback):
                                      current, filepath))
                         self.best = current
                         if self.aux_model is not None and self.aux_patience > 0:
-                            print(('-'*150) + '> Updating the Auxialiry model')
                             self.aux_model.set_weights(self.model.get_weights())
                             self.aux_count = 0
                         else:
