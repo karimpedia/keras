@@ -656,7 +656,8 @@ def get(identifier, kwargs=None):
     if K.backend() == 'tensorflow':
         # Wrap TF optimizer instances
         if isinstance(identifier, tf.train.Optimizer):
-            return TFOptimizer(identifier)
+            #return TFOptimizer(identifier)
+            return identifier
     # Instantiate a Keras optimizer
     return get_from_module(identifier, globals(), 'optimizer',
                            instantiate=True, kwargs=kwargs)

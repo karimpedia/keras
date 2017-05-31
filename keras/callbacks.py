@@ -608,6 +608,12 @@ class LearningRateScheduler(Callback):
         K.set_value(self.model.optimizer.lr, lr)
 
 
+def func(epoch):
+    return 1e-3/epoch
+
+callbacks = [LearningRateScheduler(func)]
+
+
 class TensorBoard(Callback):
     """Tensorboard basic visualizations.
 
