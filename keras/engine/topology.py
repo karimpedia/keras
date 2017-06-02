@@ -2603,6 +2603,7 @@ class Container(Layer):
         """
         return yaml.dump(self._updated_config(), **kwargs)
 
+
     def summary(self, line_length=None, positions=None):
         print_layer_summary(self,
                             line_length=line_length,
