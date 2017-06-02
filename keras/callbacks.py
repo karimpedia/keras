@@ -370,9 +370,9 @@ class ModelCheckpoint(Callback):
         period: Interval (number of epochs) between checkpoints.
     """
 
-    def __init__(self, filepath, monitor='val_loss', verbose=0,
+    def __init__(self, filepath, monitor=None, verbose=0,
                  save_best_only=False, save_weights_only=False,
-                 mode='auto', period=1, save_last=False,
+                 mode=None, period=1, save_last=False,
                  aux_model=None, aux_patience=0):
         super(ModelCheckpoint, self).__init__()
         self.filepath = filepath
@@ -390,11 +390,9 @@ class ModelCheckpoint(Callback):
 
         self.epochs_since_last_save = 0
 
-        if mode not in ['auto', 'min', 'max']:
-            warnings.warn('ModelCheckpoint mode %s is unknown, '
-                          'fallback to auto mode.' % (mode),
-                          RuntimeWarning)
-            mode = 'auto'
+        if mode is not None and mode not in ['min', 'max']:
+            raise ValueError('ModelCheckpoint: unknown mode ... please select either min, or max')
+
 
         if mode == 'min':
             self.monitor_op = np.less
@@ -403,12 +401,12 @@ class ModelCheckpoint(Callback):
             self.monitor_op = np.greater
             self.best = -np.Inf
         else:
-            if 'acc' in self.monitor or self.monitor.startswith('fmeasure'):
-                self.monitor_op = np.greater
-                self.best = -np.Inf
-            else:
-                self.monitor_op = np.less
-                self.best = np.Inf
+            if self.monitor is not None:
+                raise ValueError('If you use the ''monitor'' argument, you must set the ''mode'' argument explicitly.')
+
+        if self.save_best_only and self.monitor is None:
+            raise ValueError('If you set the ''save_best_only'' argument, you must give the metric explicitly ... self.monitor.')
+
         self.aux_count = -1
 
     def on_epoch_end(self, epoch, logs=None):
