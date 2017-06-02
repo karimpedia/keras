@@ -13,11 +13,10 @@ import warnings
 from collections import deque
 from collections import OrderedDict
 from collections import Iterable
-from .metrics import raw_binary_counts as RawBinaryCounts
+from .metrics import raw_binary_counts
 from .utils.generic_utils import Progbar
 from .utils.dpr_utils import binary_metrics
 from . import backend as K
-from .metrics import raw_binary_counts as RawBinaryCounts
 from .utils.dpr_utils import binary_metrics
 
 try:
@@ -448,7 +447,7 @@ class ModelCheckpoint(Callback):
 
     def on_train_end(self, logs={}):
         if self.save_last:
-            self.model.save(self.filepath.format(epoch=self.epochs, **logs), overwrite=True)
+            self.model.save(self.filepath.format(epoch=self.params['epochs'], **logs), overwrite=True)
 
 
 class EarlyStopping(Callback):
@@ -554,7 +553,7 @@ class OverfittingNotifier(EarlyStopping):
         if self.stopped_epoch > 0:
             print('OverfittingClb) Epoch {epoch:05d}/{self.best_epoch:05d}/{tEpc:05d}: monitored quantity '
                   'hasn''t improved for {dEpc:05d} epochs (best value: {self.best}) [{self.monitor}]'.format(
-                      tEpc=self.params['nb_epoch'], dEpc=epoch-self.best_epoch, **locals()))
+                      tEpc=self.params['epochs'], dEpc=epoch-self.best_epoch, **locals()))
 
     def on_train_end(self, logs=None):
         pass
@@ -1198,8 +1197,8 @@ class CMDProgress(Callback):
                 self.vldStr += \
                     '{lbl}:{{{valK}:{frmt}}}, '.format(lbl=v['lbl'], valK='val_'+k, frmt=v['frmt'])
         self.vldStr = self.vldStr[:-2]
-        print('\n'.join((self.epcStr.format(zPad=len(str(self.params['nb_epoch'])),
-                                            cEpc=(epoch + 1), nEpc=self.params['nb_epoch'],
+        print('\n'.join((self.epcStr.format(zPad=len(str(self.params['epochs'])),
+                                            cEpc=(epoch + 1), nEpc=self.params['epochs'],
                                             epcTF=fineEpochTime,
                                             epcTC=coarseEpochTime,
                                             lr=learning_rate),

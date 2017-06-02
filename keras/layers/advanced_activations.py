@@ -35,21 +35,23 @@ class RandomReLU(Layer):
         - [Rectifier Nonlinearities Improve Neural Network Acoustic Models](https://web.stanford.edu/~awni/papers/relu_hybrid_icml2013_final.pdf)
     """
 
-    def __init__(self, alpha_tensor=K.random_uniform((1,), low=0.1, high=1.3,),
-                 in_phase=['training'], **kwargs):
-        self.supports_masking = True
-        self.uses_learning_phase = True
-        self.alpha_tensor = alpha_tensor
-        self.in_phase = in_phase
-        super(RandomReLU, self).__init__(**kwargs)
+    def __init__(self, alpha_tensor, in_phase, **kwargs):
+        # self.supports_masking = True
+        # self.uses_learning_phase = True
+        # self.alpha_tensor = alpha_tensor
+        # self.in_phase = in_phase
+        # super(RandomReLU, self).__init__(**kwargs)
+        pass
 
     def call(self, x, mask=None):
-        return K.relu(x, alpha=self.alpha)
+        # return K.relu(x, alpha=self.alpha)
+        pass
 
     def get_config(self):
-        config = {'alpha': self.alpha}
-        base_config = super(LeakyReLU, self).get_config()
-        return dict(list(base_config.items()) + list(config.items()))
+        # config = {'alpha': self.alpha}
+        # base_config = super(LeakyReLU, self).get_config()
+        # return dict(list(base_config.items()) + list(config.items()))
+        pass
 
 
 class LeakyReLU(Layer):
