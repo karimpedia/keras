@@ -744,7 +744,8 @@ class Model(Container):
                 `sample_weight_mode` on each output by passing a
                 dictionary or a list of modes.
             **kwargs: when using the Theano backend, these arguments
-                are passed into K.function. Ignored for Tensorflow backend.
+                are passed into K.function. When using the Tensorflow backend,
+                these arguments are passed into `tf.Session.run`.
 
         # Raises
             ValueError: In case of invalid arguments for
@@ -1090,6 +1091,7 @@ class Model(Container):
             self.train_function = K.function(inputs,
                                              [self.total_loss] + self.metrics_tensors,
                                              updates=updates,
+                                             name='train_function',
                                              **self._function_kwargs)
 
     def _make_test_function(self):
@@ -1104,6 +1106,7 @@ class Model(Container):
             self.test_function = K.function(inputs,
                                             [self.total_loss] + self.metrics_tensors,
                                             updates=self.state_updates,
+                                            name='test_function',
                                             **self._function_kwargs)
 
     def _make_predict_function(self):
@@ -1120,6 +1123,7 @@ class Model(Container):
             self.predict_function = K.function(inputs,
                                                self.outputs,
                                                updates=self.state_updates,
+                                               name='predict_function',
                                                **kwargs)
 
     def _fit_loop(self, f, ins, out_labels=None, batch_size=32,
@@ -1230,6 +1234,8 @@ class Model(Container):
                     batch_logs[l] = o
 
                 callbacks.on_batch_end(batch_index, batch_logs)
+                if callback_model.stop_training:
+                    break
 
                 if batch_index == len(batches) - 1:  # Last batch.
                     if do_validation:
@@ -1910,8 +1916,11 @@ class Model(Container):
                                  str(validation_data))
             val_x, val_y, val_sample_weights = self._standardize_user_data(
                 val_x, val_y, val_sample_weight)
+            val_data = val_x + val_y + val_sample_weights
+            if self.uses_learning_phase and not isinstance(K.learning_phase(), int):
+                val_data += [0.]
             for cbk in callbacks:
-                cbk.validation_data = val_x + [val_y, val_sample_weights]
+                cbk.validation_data = val_data
         enqueuer = None
 
         try:

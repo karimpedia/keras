@@ -120,14 +120,13 @@ PAGES = [
             models.Sequential.fit,
             models.Sequential.evaluate,
             models.Sequential.predict,
-            models.Sequential.predict_classes,
-            models.Sequential.predict_proba,
             models.Sequential.train_on_batch,
             models.Sequential.test_on_batch,
             models.Sequential.predict_on_batch,
             models.Sequential.fit_generator,
             models.Sequential.evaluate_generator,
             models.Sequential.predict_generator,
+            models.Sequential.get_layer,
         ],
     },
     {
@@ -388,7 +387,7 @@ def process_class_docstring(docstring):
                        r'\n    __\1__\n\n',
                        docstring)
 
-    docstring = re.sub(r'    ([^\s\\]+):(.*)\n',
+    docstring = re.sub(r'    ([^\s\\\(]+):(.*)\n',
                        r'    - __\1__:\2\n',
                        docstring)
 
@@ -406,7 +405,7 @@ def process_function_docstring(docstring):
                        r'\n        __\1__\n\n',
                        docstring)
 
-    docstring = re.sub(r'    ([^\s\\]+):(.*)\n',
+    docstring = re.sub(r'    ([^\s\\\(]+):(.*)\n',
                        r'    - __\1__:\2\n',
                        docstring)
 
