@@ -84,7 +84,7 @@ def dice_coef(y_true, y_pred, smooth=1):
 
 
 def dice_coef_loss(y_true, y_pred):
-    return -K.sum(y_true * y_pred, axis=-1) / (K.sum(y_true, axis=-1) + K.sum(y_pred, axis=-1))
+    return -(K.sum(y_true * y_pred, axis=-1) + 1.0) / (K.sum(K.square(y_true), axis=-1) + K.sum(K.square(y_pred), axis=-1) + 1.0)
 
 
 def neg_jaccard_index(y_true, y_pred):
