@@ -87,6 +87,18 @@ def dice_coef_loss(y_true, y_pred):
     return -K.sum(y_true * y_pred, axis=-1) / (K.sum(y_true, axis=-1) + K.sum(y_pred, axis=-1))
 
 
+def neg_jaccard_index(y_true, y_pred):
+    M11 = K.sum(y_true * y_pred, axis=-1)
+    return - M11 / (M11 + K.sum(y_true, axis=-1) + K.sum(y_pred, axis=-1))
+
+
+def jaccard_distance(y_true, y_pred):
+    M11 = K.sum(y_true * y_pred, axis=-1)
+    M01 = K.sum((1.0 - y_true) * y_pred, axis=-1)
+    M10 = K.sum(y_true * (1.0 - y_pred), axis=-1)
+    return (M01 + M10) / (M01 + M10 + M11)
+
+
 # Aliases.
 
 mse = MSE = mean_squared_error
