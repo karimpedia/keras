@@ -17,6 +17,8 @@ from .. import backend as K
 from .. import initializers
 from ..utils.io_utils import ask_to_proceed_with_overwrite
 from ..utils.layer_utils import print_summary as print_layer_summary
+from ..utils.layer_utils import summary2str as layer_summary_2str
+
 from ..utils import conv_utils
 from ..legacy import interfaces
 
@@ -2626,9 +2628,12 @@ class Container(Layer):
 
 
     def summary(self, line_length=None, positions=None):
-        print_layer_summary(self,
-                            line_length=line_length,
-                            positions=positions)
+        print_layer_summary(self, line_length=line_length, positions=positions)
+
+    # def get_summary(self, line_length=115, positions=[.33, .55, .67, 1.]):
+    def summary2str(self, line_length=None, positions=None):
+        return layer_summary_2str(self, line_length=line_length, positions=positions)
+
 
 
 def get_source_inputs(tensor, layer=None, node_index=None):

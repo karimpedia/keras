@@ -123,6 +123,130 @@ def print_summary(model, line_length=None, positions=None):
     print('_' * line_length)
 
 
+def summary2str(model, line_length=None, positions=None, line_breaker='\r\n'):
+    """Returns a string summary of a model.
+
+    # Arguments
+        model: Keras model instance.
+        line_length: total length of printed lines
+        positions: relative or absolute positions of log elements in each line.
+            If not provided, defaults to `[.33, .55, .67, 1.]`.
+    """
+    out_str = ''
+
+    if model.__class__.__name__ == 'Sequential':
+        sequential_like = True
+    else:
+        sequential_like = True
+        for v in model.nodes_by_depth.values():
+            if (len(v) > 1) or (len(v) == 1 and len(v[0].inbound_layers) > 1):
+                # if the model has multiple nodes or if the nodes have multiple inbound_layers
+                # the model is no longer sequential
+                sequential_like = False
+                break
+
+    if sequential_like:
+        line_length = line_length or 65
+        positions = positions or [.45, .85, 1.]
+        if positions[-1] <= 1:
+            positions = [int(line_length * p) for p in positions]
+        # header names for the different log elements
+        to_display = ['Layer (type)', 'Output Shape', 'Param #']
+    else:
+        line_length = line_length or 100
+        positions = positions or [.33, .55, .67, 1.]
+        if positions[-1] <= 1:
+            positions = [int(line_length * p) for p in positions]
+        # header names for the different log elements
+        to_display = ['Layer (type)', 'Output Shape', 'Param #', 'Connected to']
+        relevant_nodes = []
+        for v in model.nodes_by_depth.values():
+            relevant_nodes += v
+
+    def row2str(fields, positions):
+        line = ''
+        for i in range(len(fields)):
+            if i > 0:
+                line = line[:-1] + ' '
+            line += str(fields[i])
+            line = line[:positions[i]]
+            line += ' ' * (positions[i] - len(line))
+        return line
+
+    out_str += ('_' * line_length) + line_breaker
+    out_str += row2str(to_display, positions) + line_breaker
+    out_str += ('=' * line_length) + line_breaker
+
+    def layer_summary_2str(layer):
+        try:
+            output_shape = layer.output_shape
+        except AttributeError:
+            output_shape = 'multiple'
+        name = layer.name
+        cls_name = layer.__class__.__name__
+        fields = [name + ' (' + cls_name + ')', output_shape, layer.count_params()]
+        return (row2str(fields, positions))
+
+    def layer_summary_with_connections_2str(layer):
+        """Prints a summary for a single layer.
+
+        # Arguments
+            layer: target layer.
+        """
+        fStr = ''
+        try:
+            output_shape = layer.output_shape
+        except AttributeError:
+            output_shape = 'multiple'
+        connections = []
+        for node in layer.inbound_nodes:
+            if relevant_nodes and node not in relevant_nodes:
+                # node is not part of the current network
+                continue
+            for i in range(len(node.inbound_layers)):
+                inbound_layer = node.inbound_layers[i].name
+                inbound_node_index = node.node_indices[i]
+                inbound_tensor_index = node.tensor_indices[i]
+                connections.append(inbound_layer + '[' + str(inbound_node_index) + '][' + str(inbound_tensor_index) + ']')
+
+        name = layer.name
+        cls_name = layer.__class__.__name__
+        if not connections:
+            first_connection = ''
+        else:
+            first_connection = connections[0]
+        fields = [name + ' (' + cls_name + ')', output_shape, layer.count_params(), first_connection]
+        fStr += row2str(fields, positions) + line_breaker
+        if len(connections) > 1:
+            for i in range(1, len(connections)):
+                fields = ['', '', '', connections[i]]
+                fStr += row2str(fields, positions) + line_breaker
+        return fStr
+
+    layers = model.layers
+    for i in range(len(layers)):
+        if sequential_like:
+            out_str += layer_summary_2str(layers[i]) + line_breaker
+        else:
+            layer_summary_with_connections_2str(layers[i])
+        if i == len(layers) - 1:
+            out_str += ('=' * line_length) + line_breaker
+        else:
+            out_str += ('_' * line_length) + line_breaker
+
+    trainable_count = int(
+        np.sum([K.count_params(p) for p in set(model.trainable_weights)]))
+    non_trainable_count = int(
+        np.sum([K.count_params(p) for p in set(model.non_trainable_weights)]))
+
+    out_str += ('Total params: {:,}'.format(trainable_count + non_trainable_count)) + line_breaker
+    out_str += ('Trainable params: {:,}'.format(trainable_count)) + line_breaker
+    out_str += ('Non-trainable params: {:,}'.format(non_trainable_count)) + line_breaker
+    out_str += ('_' * line_length)
+    return out_str
+
+
+
 def convert_all_kernels_in_model(model):
     """Converts all convolution kernels in a model from Theano to TensorFlow.
 
