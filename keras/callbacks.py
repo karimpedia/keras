@@ -1207,7 +1207,10 @@ class CMDProgress(Callback):
     CMDMetricsStr = OrderedDict()
     CMDMetricsStr['loss'] = {'lbl': 'L', 'frmt': '.5E'}
     CMDMetricsStr['binary_crossentropy'] = {'lbl': 'bCE', 'frmt': '011.7f'}
-    CMDMetricsStr['binary_accuracy'] = {'lbl': 'ACC', 'frmt': '010.8f'}
+    CMDMetricsStr['binary_accuracy'] = {'lbl': 'bACC', 'frmt': '010.8f'}
+    CMDMetricsStr['categorical_crossentropy'] = {'lbl': 'cCE', 'frmt': '011.7f'}
+    CMDMetricsStr['categorical_accuracy'] = {'lbl': 'cACC', 'frmt': '010.8f'}
+    CMDMetricsStr['accuracy'] = {'lbl': 'ACC', 'frmt': '010.8f'}
     CMDMetricsStr['f1s'] = {'lbl': '|F1S', 'frmt': '010.8f'}
     CMDMetricsStr['ppv'] = {'lbl': '|PPV', 'frmt': '010.8f'}
     CMDMetricsStr['tpr'] = {'lbl': '|TPR', 'frmt': '010.8f'}
