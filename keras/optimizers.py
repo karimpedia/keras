@@ -672,7 +672,7 @@ def get(identifier):
     """
     if K.backend() == 'tensorflow':
         # Wrap TF optimizer instances
-        if isinstance(identifier, tf.train.Optimizer):
+        if False and isinstance(identifier, tf.train.Optimizer):
             return TFOptimizer(identifier)
     if isinstance(identifier, dict):
         return deserialize(identifier)
