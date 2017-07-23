@@ -17,22 +17,6 @@ from .losses import cosine_proximity
 from .utils.generic_utils import deserialize_keras_object
 
 
-
-def dice_coef(y_true, y_pred, smooth=1):
-    """
-    Dice = (2*|X & Y|)/ (|X|+ |Y|)
-         =  2*sum(|A*B|)/(sum(A^2)+sum(B^2))
-    ref: https://arxiv.org/pdf/1606.04797v1.pdf
-    """
-    intersection = K.sum(K.abs(y_true * y_pred), axis=-1)
-    return (2. * intersection + smooth) / (K.sum(K.square(y_true), -1) + K.sum(K.square(y_pred), -1) + smooth)
-
-
-def dice_coef_loss(y_true, y_pred):
-    return 1-dice_coef(y_true, y_pred)
-
-
-
 def binary_accuracy(y_true, y_pred):
     return K.mean(K.equal(y_true, K.round(y_pred)), axis=-1)
 
@@ -52,6 +36,23 @@ def sparse_categorical_accuracy(y_true, y_pred):
 def top_k_categorical_accuracy(y_true, y_pred, k=5):
     return K.mean(K.in_top_k(y_pred, K.argmax(y_true, axis=-1), k), axis=-1)
 
+def sparse_top_k_categorical_accuracy(y_true, y_pred, k=5):
+    return K.mean(K.in_top_k(y_pred, K.cast(K.max(y_true, axis=-1), 'int32'), k), axis=-1)
+
+
+def dice_coef(y_true, y_pred, smooth=1):
+    """
+    Dice = (2*|X & Y|)/ (|X|+ |Y|)
+         =  2*sum(|A*B|)/(sum(A^2)+sum(B^2))
+    ref: https://arxiv.org/pdf/1606.04797v1.pdf
+    """
+    intersection = K.sum(K.abs(y_true * y_pred), axis=-1)
+    return (2. * intersection + smooth) / (K.sum(K.square(y_true), -1) + K.sum(K.square(y_pred), -1) + smooth)
+
+
+def dice_coef_loss(y_true, y_pred):
+    return 1-dice_coef(y_true, y_pred)
+    
 
 def binary_tp(y_true, y_pred):
     return K.mean(K.round(K.clip(y_true * y_pred, 0, 1)))

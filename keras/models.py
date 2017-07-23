@@ -74,7 +74,11 @@ def save_model(model, filepath, overwrite=True, include_optimizer=True):
 
         # if obj is any numpy type
         if type(obj).__module__ == np.__name__:
-            return obj.item()
+            if isinstance(obj, np.ndarray):
+                return {'type': type(obj),
+                        'value': obj.tolist()}
+            else:
+                return obj.item()
 
         # misc functions (e.g. loss function)
         if callable(obj):
@@ -140,8 +144,8 @@ def save_model(model, filepath, overwrite=True, include_optimizer=True):
                 weight_values = K.batch_get_value(symbolic_weights)
                 weight_names = []
                 for i, (w, val) in enumerate(zip(symbolic_weights, weight_values)):
-                    # Default values of symbolic_weights is /variable for theano
-                    if K.backend() == 'theano':
+                    # Default values of symbolic_weights is /variable for theano and cntk
+                    if K.backend() == 'theano' or K.backend() == 'cntk':
                         if hasattr(w, 'name') and w.name != "/variable":
                             name = str(w.name)
                         else:
@@ -203,32 +207,19 @@ def load_model(filepath, custom_objects=None, compile=True):
             obj: object, dict, or list.
 
         # Returns
-            The same structure, where occurences
+            The same structure, where occurrences
                 of a custom object name have been replaced
                 with the custom object.
         """
         if isinstance(obj, list):
             deserialized = []
             for value in obj:
-                if value in custom_objects:
-                    deserialized.append(custom_objects[value])
-                else:
-                    deserialized.append(value)
+                deserialized.append(convert_custom_objects(value))
             return deserialized
         if isinstance(obj, dict):
             deserialized = {}
             for key, value in obj.items():
-                deserialized[key] = []
-                if isinstance(value, list):
-                    for element in value:
-                        if element in custom_objects:
-                            deserialized[key].append(custom_objects[element])
-                        else:
-                            deserialized[key].append(element)
-                elif value in custom_objects:
-                    deserialized[key] = custom_objects[value]
-                else:
-                    deserialized[key] = value
+                deserialized[key] = convert_custom_objects(value)
             return deserialized
         if obj in custom_objects:
             return custom_objects[obj]
@@ -284,7 +275,13 @@ def load_model(filepath, custom_objects=None, compile=True):
                                       optimizer_weights_group.attrs['weight_names']]
             optimizer_weight_values = [optimizer_weights_group[n] for n in
                                        optimizer_weight_names]
-            model.optimizer.set_weights(optimizer_weight_values)
+            try:
+                model.optimizer.set_weights(optimizer_weight_values)
+            except ValueError:
+                warnings.warn('Error in loading the saved optimizer '
+                              'state. As a result, your model is '
+                              'starting with a freshly initialized '
+                              'optimizer.')
     return model
 
 
@@ -519,12 +516,12 @@ class Sequential(Model):
         # Returns
             A layer instance.
         """
-        if self.model is None:
+        if not self.built:
             self.build()
         return self.model.get_layer(name, index)
 
     def call(self, inputs, mask=None):
-        if self.model is None:
+        if not self.built:
             self.build()
         return self.model.call(inputs, mask)
 
@@ -563,7 +560,7 @@ class Sequential(Model):
 
     @property
     def uses_learning_phase(self):
-        if self.model is None:
+        if not self.built:
             self.build()
         return self.model.uses_learning_phase
 
@@ -628,41 +625,41 @@ class Sequential(Model):
 
     @property
     def updates(self):
-        if self.model is None:
+        if not self.built:
             self.build()
         return self.model.updates
 
     @property
     def state_updates(self):
-        if self.model is None:
+        if not self.built:
             self.build()
         return self.model.state_updates
 
     def get_updates_for(self, inputs):
-        if self.model is None:
+        if not self.built:
             self.build()
         return self.model.get_updates_for(inputs)
 
     @property
     def losses(self):
-        if self.model is None:
+        if not self.built:
             self.build()
         return self.model.losses
 
     def get_losses_for(self, inputs):
-        if self.model is None:
+        if not self.built:
             self.build()
         return self.model.get_losses_for(inputs)
 
     @property
     def regularizers(self):
-        if self.model is None:
+        if not self.built:
             self.build()
         return self.model.regularizers
 
     @property
     def constraints(self):
-        if self.model is None:
+        if not self.built:
             self.build()
         return self.model.constraints
 
@@ -681,7 +678,7 @@ class Sequential(Model):
                 weights.append(layer.get_weights())
             return weights
 
-        if self.model is None:
+        if not self.built:
             self.build()
         return self.model.get_weights()
 
@@ -701,7 +698,7 @@ class Sequential(Model):
                 layer.set_weights(weights[:nb_param])
                 weights = weights[nb_param:]
 
-        if self.model is None:
+        if not self.built:
             self.build()
         self.model.set_weights(weights)
 
@@ -761,9 +758,9 @@ class Sequential(Model):
             sample_weight_mode: if you need to do timestep-wise
                 sample weighting (2D weights), set this to "temporal".
                 "None" defaults to sample-wise weights (1D).
-            **kwargs: for Theano backend, these are passed into K.function.
-                When using the Tensorflow backend, these are passed into
-                `tf.Session.run`.
+            **kwargs: for Theano/CNTK backends, these are passed into
+                K.function. When using the TensorFlow backend, these are
+                passed into `tf.Session.run`.
 
         # Example
             ```python
@@ -850,7 +847,7 @@ class Sequential(Model):
         if kwargs:
             raise TypeError('Unrecognized keyword arguments: ' + str(kwargs))
 
-        if self.model is None:
+        if not self.built:
             raise RuntimeError('The model needs to be compiled '
                                'before being used.')
         return self.model.fit(x, y,
@@ -886,7 +883,7 @@ class Sequential(Model):
         # Raises
             RuntimeError: if the model was never compiled.
         """
-        if self.model is None:
+        if not self.built:
             raise RuntimeError('The model needs to be compiled '
                                'before being used.')
         return self.model.evaluate(x, y,
@@ -907,7 +904,7 @@ class Sequential(Model):
         # Returns
             A Numpy array of predictions.
         """
-        if self.model is None:
+        if not self.built:
             self.build()
         return self.model.predict(x, batch_size=batch_size, verbose=verbose)
 
@@ -921,7 +918,7 @@ class Sequential(Model):
         # Returns
             A Numpy array of predictions.
         """
-        if self.model is None:
+        if not self.built:
             self.build()
         return self.model.predict_on_batch(x)
 
@@ -946,7 +943,7 @@ class Sequential(Model):
         # Raises
             RuntimeError: if the model was never compiled.
         """
-        if self.model is None:
+        if not self.built:
             raise RuntimeError('The model needs to be compiled '
                                'before being used.')
         return self.model.train_on_batch(x, y,
@@ -972,7 +969,7 @@ class Sequential(Model):
         # Raises
             RuntimeError: if the model was never compiled.
         """
-        if self.model is None:
+        if not self.built:
             raise RuntimeError('The model needs to be compiled '
                                'before being used.')
         return self.model.test_on_batch(x, y,
@@ -1029,9 +1026,9 @@ class Sequential(Model):
                       validation_data=None,
                       validation_steps=None,
                       class_weight=None,
-                      max_q_size=10,
+                      max_queue_size=10,
                       workers=1,
-                      pickle_safe=False,
+                      use_multiprocessing=False,
                       initial_epoch=0):
         """Fits the model on data generated batch-by-batch by a Python generator.
 
@@ -1068,9 +1065,9 @@ class Sequential(Model):
                 validation dataset divided by the batch size.
             class_weight: Dictionary mapping class indices to a weight
                 for the class.
-            max_q_size: Maximum size for the generator queue
+            max_queue_size: Maximum size for the generator queue
             workers: Maximum number of processes to spin up
-            pickle_safe: Ff True, use process based threading.
+            use_multiprocessing: if True, use process based threading.
                 Note that because
                 this implementation relies on multiprocessing,
                 you should not pass
@@ -1103,7 +1100,7 @@ class Sequential(Model):
                                 steps_per_epoch=1000, epochs=10)
         ```
         """
-        if self.model is None:
+        if not self.built:
             raise RuntimeError('The model needs to be compiled '
                                'before being used.')
         return self.model.fit_generator(generator,
@@ -1114,15 +1111,15 @@ class Sequential(Model):
                                         validation_data=validation_data,
                                         validation_steps=validation_steps,
                                         class_weight=class_weight,
-                                        max_q_size=max_q_size,
+                                        max_queue_size=max_queue_size,
                                         workers=workers,
-                                        pickle_safe=pickle_safe,
+                                        use_multiprocessing=use_multiprocessing,
                                         initial_epoch=initial_epoch)
 
     @interfaces.legacy_generator_methods_support
     def evaluate_generator(self, generator, steps,
-                           max_q_size=10, workers=1,
-                           pickle_safe=False):
+                           max_queue_size=10, workers=1,
+                           use_multiprocessing=False):
         """Evaluates the model on a data generator.
 
         The generator should return the same kind of data
@@ -1133,9 +1130,9 @@ class Sequential(Model):
                 or (inputs, targets, sample_weights)
             steps: Total number of steps (batches of samples)
                 to yield from `generator` before stopping.
-            max_q_size: maximum size for the generator queue
+            max_queue_size: maximum size for the generator queue
             workers: maximum number of processes to spin up
-            pickle_safe: if True, use process based threading.
+            use_multiprocessing: if True, use process based threading.
                 Note that because this implementation
                 relies on multiprocessing, you should not pass
                 non picklable arguments to the generator
@@ -1150,19 +1147,19 @@ class Sequential(Model):
         # Raises
             RuntimeError: if the model was never compiled.
         """
-        if self.model is None:
+        if not self.built:
             raise RuntimeError('The model needs to be compiled '
                                'before being used.')
         return self.model.evaluate_generator(generator,
                                              steps,
-                                             max_q_size=max_q_size,
+                                             max_queue_size=max_queue_size,
                                              workers=workers,
-                                             pickle_safe=pickle_safe)
+                                             use_multiprocessing=use_multiprocessing)
 
     @interfaces.legacy_generator_methods_support
     def predict_generator(self, generator, steps,
-                          max_q_size=10, workers=1,
-                          pickle_safe=False, verbose=0):
+                          max_queue_size=10, workers=1,
+                          use_multiprocessing=False, verbose=0):
         """Generates predictions for the input samples from a data generator.
 
         The generator should return the same kind of data as accepted by
@@ -1172,9 +1169,9 @@ class Sequential(Model):
             generator: generator yielding batches of input samples.
             steps: Total number of steps (batches of samples)
                 to yield from `generator` before stopping.
-            max_q_size: maximum size for the generator queue
+            max_queue_size: maximum size for the generator queue
             workers: maximum number of processes to spin up
-            pickle_safe: if True, use process based threading.
+            use_multiprocessing: if True, use process based threading.
                 Note that because this implementation
                 relies on multiprocessing, you should not pass
                 non picklable arguments to the generator
@@ -1184,12 +1181,12 @@ class Sequential(Model):
         # Returns
             A Numpy array of predictions.
         """
-        if self.model is None:
+        if not self.built:
             self.build()
         return self.model.predict_generator(generator, steps,
-                                            max_q_size=max_q_size,
+                                            max_queue_size=max_queue_size,
                                             workers=workers,
-                                            pickle_safe=pickle_safe,
+                                            use_multiprocessing=use_multiprocessing,
                                             verbose=verbose)
 
     def get_config(self):
