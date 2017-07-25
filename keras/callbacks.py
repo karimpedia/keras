@@ -1168,6 +1168,8 @@ class BinaryLogger(Callback):
             for x in self.metrics:
                 logs['val_' + x] = vld_metrics[x]
 
+
+
 class GetHistoryCallback(Callback):
     '''A Callback that periodically gives training history (as a dict) to a given function
     '''
@@ -1175,32 +1177,35 @@ class GetHistoryCallback(Callback):
         self.func = func
         self.period = period
         self.save_last = save_last
-        # TODO: func can be any function or method
+
         _lcl = locals()
         self.config = {k: _lcl[k] for k in ['func', 'period', 'save_last']}
+
+        super(GetHistoryCallback, self).__init__()
 
     def on_train_begin(self, logs={}):
         self.epoch = []
         self.history = {}
 
-    def on_epoch_begin(self, epoch, logs={}):
+    def on_epoch_begin(self, epoch, logs=None):
         self.epoch_begin_time = time.time()
 
-    def on_epoch_end(self, epoch, logs={}):
+    def on_epoch_end(self, epoch, logs=None):
         epoch_end_time = time.time()
         epoch_duration = epoch_end_time - self.epoch_begin_time
         self.history.setdefault('epoch', []).append(epoch)
         self.history.setdefault('epoch_begin_time', []).append(self.epoch_begin_time)
         self.history.setdefault('epoch_end_time', []).append(epoch_end_time)
         self.history.setdefault('epoch_duration', []).append(epoch_duration)
-        for k, v in logs.items():
-            self.history.setdefault(k, []).append(v)
+        if logs:
+            for k, v in logs.items():
+                self.history.setdefault(k, []).append(v)
         if (epoch + 1) % self.period == 0:
             self.func(self.history)
 
-    def on_train_end(self, logs={}):
-        if self.save_last:
-            self.func(self.history)
+    def on_train_end(self, logs=None):
+        self.func(self.history) if self.save_last else None
+
 
 
 class CMDProgress(Callback):
