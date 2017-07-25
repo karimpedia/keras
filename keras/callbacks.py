@@ -1214,16 +1214,31 @@ class CMDProgress(Callback):
     CMDMetricsStr = OrderedDict()
     CMDMetricsStr['loss'] = {'lbl': 'L', 'frmt': '.5E'}
     CMDMetricsStr['binary_crossentropy'] = {'lbl': 'bCE', 'frmt': '011.7f'}
-    CMDMetricsStr['binary_accuracy'] = {'lbl': 'bACC', 'frmt': '010.8f'}
     CMDMetricsStr['categorical_crossentropy'] = {'lbl': 'cCE', 'frmt': '011.7f'}
-    CMDMetricsStr['categorical_accuracy'] = {'lbl': 'cACC', 'frmt': '010.8f'}
+
+    CMDMetricsStr['tpr'] = {'lbl': 'TPR', 'frmt': '010.8f'}
+    CMDMetricsStr['tnr'] = {'lbl': 'TNR', 'frmt': '010.8f'}
+    CMDMetricsStr['fpr'] = {'lbl': 'FPR', 'frmt': '010.8f'}
+    CMDMetricsStr['fnr'] = {'lbl': 'FNR', 'frmt': '010.8f'}
+    CMDMetricsStr['tpa'] = {'lbl': 'TPA', 'frmt': '010.8f'}
+    CMDMetricsStr['tna'] = {'lbl': 'TNA', 'frmt': '010.8f'}
+    CMDMetricsStr['fpa'] = {'lbl': 'FPA', 'frmt': '010.8f'}
+    CMDMetricsStr['fna'] = {'lbl': 'FNA', 'frmt': '010.8f'}
+
+    CMDMetricsStr['rp'] = {'lbl': 'RP', 'frmt': '010.8f'}
+    CMDMetricsStr['rn'] = {'lbl': 'RN', 'frmt': '010.8f'}
+    CMDMetricsStr['pp'] = {'lbl': 'PP', 'frmt': '010.8f'}
+    CMDMetricsStr['pn'] = {'lbl': 'PN', 'frmt': '010.8f'}
+
+    CMDMetricsStr['informedness'] = {'lbl': 'B', 'frmt': '010.8f'}
+    CMDMetricsStr['markedness'] = {'lbl': 'M', 'frmt': '010.8f'}
+    CMDMetricsStr['mcc'] = {'lbl': 'MCC', 'frmt': '010.8f'}
+    CMDMetricsStr['auc'] = {'lbl': 'AUC', 'frmt': '010.8f'}
+    CMDMetricsStr['f1s'] = {'lbl': 'F1S', 'frmt': '010.8f'}
+
     CMDMetricsStr['accuracy'] = {'lbl': 'ACC', 'frmt': '010.8f'}
-    CMDMetricsStr['f1s'] = {'lbl': '|F1S', 'frmt': '010.8f'}
-    CMDMetricsStr['ppv'] = {'lbl': '|PPV', 'frmt': '010.8f'}
-    CMDMetricsStr['tpr'] = {'lbl': '|TPR', 'frmt': '010.8f'}
-    CMDMetricsStr['tnr'] = {'lbl': '|TNR', 'frmt': '010.8f'}
-    CMDMetricsStr['fpr'] = {'lbl': '|FPR', 'frmt': '010.8f'}
-    CMDMetricsStr['fnr'] = {'lbl': '|FNR', 'frmt': '010.8f'}
+    CMDMetricsStr['binary_accuracy'] = {'lbl': 'bACC', 'frmt': '010.8f'}
+    CMDMetricsStr['categorical_accuracy'] = {'lbl': 'cACC', 'frmt': '010.8f'}
 
     CMDMetricsStr['mean_absolute_error'] = {'lbl': 'MAE', 'frmt': '011.7f'}
     CMDMetricsStr['mae'] = {'lbl': 'MAE', 'frmt': '011.7f'}
@@ -1239,10 +1254,10 @@ class CMDProgress(Callback):
     CMDMetricsStr['tnr_fpr'] = {'lbl': 'TnR+FPR=1', 'frmt': '010.8f'}
 
     def __init__(self, cmd_elements=CMDMetricsStr):
-        self.epcStr = 'Epoch {cEpc:0{zPad}d}/{nEpc:{zPad}d}: '\
-            '{epcTF:.2f} seconds ({epcTC:.2f} seconds) '\
-            '[LR: {lr:01.10e}]'
         self.cmd_elements = cmd_elements
+        self.epcStr = \
+            'Epoch {cEpc:0{zPad}d}/{nEpc:{zPad}d}: {epcTF:.2f} seconds ({epcTC:.2f} seconds) [LR: {lr:01.10e}]'
+
         _lcl = locals()
         self.config = {k: _lcl[k] for k in ['cmd_elements']}
 
@@ -1258,31 +1273,38 @@ class CMDProgress(Callback):
         coarseEpochTime = epcEndTime - self.epcEndTime
         fineEpochTime = epcEndTime - self.epcStartTime
         self.epcEndTime = epcEndTime
-        #TODO
-        learning_rate = logs['lr'] if 'lr' in logs.keys() else K.get_value(self.model.optimizer.lr)
-        self.trnStr = 'trn) '
+
+        trnStr = []
         for k, v in self.cmd_elements.items():
             if k in logs.keys():
-                self.trnStr += \
-                    '{lbl}:{{{valK}:{frmt}}}, '.format(lbl=v['lbl'], valK=k, frmt=v['frmt'])
-        self.trnStr = self.trnStr[:-2]
-        self.vldStr = 'vld) '
+                trnStr += '{lbl}:{{{key}:{frmt}}}'.format(lbl=v['lbl'], key=k, frmt=v['frmt'])
+        trnStr = ', '.join(trnStr).format(**logs)
+
+        vldStr = []
         for k, v in self.cmd_elements.items():
             if ('val_'+k) in logs.keys():
-                self.vldStr += \
-                    '{lbl}:{{{valK}:{frmt}}}, '.format(lbl=v['lbl'], valK='val_'+k, frmt=v['frmt'])
-        self.vldStr = self.vldStr[:-2]
-        print('\n'.join((self.epcStr.format(zPad=len(str(self.params['epochs'])),
-                                            cEpc=(epoch + 1), nEpc=self.params['epochs'],
-                                            epcTF=fineEpochTime,
-                                            epcTC=coarseEpochTime,
-                                            lr=learning_rate),
-                         self.trnStr.format(**logs),
-                         self.vldStr.format(**logs))))
+                vldStr += '{lbl}:{{{key}:{frmt}}}'.format(lbl=v['lbl'], key='val_'+k, frmt=v['frmt'])
+        vldStr = ', '.join(vldStr).format(**logs)
+
+        evlStr = []
+        for k, v in self.cmd_elements.items():
+            if ('evl_'+k) in logs.keys():
+                evlStr += '{lbl}:{{{key}:{frmt}}}'.format(lbl=v['lbl'], key='evl_'+k, frmt=v['frmt'])
+        evlStr = ', '.join(evlStr).format(**logs)
+
+
+        headerStr = self.epcStr.format(zPad=len(str(self.params['epochs'])), cEpc=(epoch + 1),
+                                       nEpc=self.params['epochs'], epcTF=fineEpochTime, epcTC=coarseEpochTime,
+                                       lr=logs['lr'] if 'lr' in logs.keys() else K.get_value(self.model.optimizer.lr))
+        strList = [headerStr] + [trnStr] if trnStr else [] + [vldStr] if vldStr else [] + [evlStr] if vldStr else []
+
+        print('\n'.join(strList))
+
 
     def on_train_end(self, logs={}):
         self.trnEndTime = time.time()
         trnT = self.trnEndTime - self.trnStartTime
-        print('Total elapsed time: {} seconds'.format(trnT))
-        print('..................: {} minutes'.format(round(trnT / 60.0)))
-        print('..................: {:.2f} hours'.format(trnT / 3600.0))
+        print('Total elapsed time: {:.3f} seconds'.format(trnT))
+        print('..................: {:.3f} minutes'.format(round(trnT / 60.)))
+        print('..................: {:.3f} hours'.format(trnT / 60. / 60.))
+        print('..................: {:.3f} days'.format(trnT / 60. / 60. / 24.))
