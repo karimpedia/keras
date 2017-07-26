@@ -67,7 +67,7 @@ def binary_metrics(binary_tp, binary_tn, binary_fp, binary_fn, beta=1.0):
     mt['informedness'] = tpr + mt['tnr'] - 1
     mt['markedness'] = ppv + npv - 1
     mt['mcc'] = (binary_tp * binary_tn - binary_fp * binary_fn) /\
-                (sqrt((binary_tp + binary_fp)*(binary_tp + binary_fn)*(binary_tn + binary_fp)*(binary_tn + binary_fn)) + _eps)
+                (np.sqrt((binary_tp + binary_fp)*(binary_tp + binary_fn)*(binary_tn + binary_fp)*(binary_tn + binary_fn)) + _eps)
     mt['evenness'] = mt['prevalence'] * mt['inverse_prevalence']
 
     return mt
@@ -118,7 +118,7 @@ def binary_metrics_2(binary_tp, binary_tn, binary_fp, binary_fn, beta=1.0):
     mt['informedness'] = tpr + mt['tnr'] - 1
     mt['markedness'] = ppv + npv - 1
     mt['mcc'] = (binary_tp * binary_tn - binary_fp * binary_fn + _eps) /\
-        (sqrt((binary_tp + binary_fp) * (binary_tp + binary_fn) * (binary_tn + binary_fp) * (binary_tn + binary_fn)) + _eps)
+        (np.sqrt((binary_tp + binary_fp) * (binary_tp + binary_fn) * (binary_tn + binary_fp) * (binary_tn + binary_fn)) + _eps)
     mt['evenness'] = mt['prevalence'] * mt['inverse_prevalence']
 
     return mt
@@ -173,9 +173,23 @@ def binary_metrics_3(binary_tp, binary_tn, binary_fp, binary_fn, beta=1.0):
     mt['auc'] = (tpr + mt['tnr']) / 2.0
     mt['informedness'] = tpr + mt['tnr'] - 1
     mt['markedness'] = ppv + npv - 1
-    mt['mcc'] = (binary_tp * binary_tn - binary_fp * binary_fn) /\
-        sqrt((binary_tp + binary_fp) * (binary_tp + binary_fn) * (binary_tn + binary_fp) * (binary_tn + binary_fn))
+    mt['mcc'] = (binary_tp * binary_tn - binary_fp * binary_fn) / \
+        np.sqrt((binary_tp + binary_fp) * (binary_tp + binary_fn) * (binary_tn + binary_fp) * (binary_tn + binary_fn))
     mt['evenness'] = mt['prevalence'] * mt['inverse_prevalence']
 
     return mt
 
+
+def refined_binary_metrics(mt):
+    metrics_list = (
+        'binary_tp', 'binary_tn', 'binary_fp', 'binary_fn', 'beta', 'true_positives', 'true_negatives',
+        'false_positives', 'false_negatives', 'pred_positives', 'pred_negatives', 'real_positives', 'real_negatives',
+        'class_ratio', 'true_positive_rate', 'true_negative_rate', 'false_positive_rate', 'false_negative_rate',
+        'positive_predictive_value', 'negative_predictive_value', 'false_discovery_rate', 'false_omission_rate',
+        'arithmetic_mean', 'geometric_mean', 'harmonic_mean', 'fbetascore', 'rand_accuracy', 'jaccard', 'auc',
+        'informedness', 'markedness', 'mcc', 'evenness')
+    rt = OrderedDict()
+    for k in metrics_list:
+        rt[k] = mt[k]
+
+    return rt

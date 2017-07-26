@@ -1274,6 +1274,7 @@ class CMDProgress(Callback):
         self.epcStartTime = time.time()
 
     def on_epoch_end(self, epoch, logs={}):
+        print(logs)
         epcEndTime = time.time()
         coarseEpochTime = epcEndTime - self.epcEndTime
         fineEpochTime = epcEndTime - self.epcStartTime
@@ -1282,26 +1283,35 @@ class CMDProgress(Callback):
         trnStr = []
         for k, v in self.cmd_elements.items():
             if k in logs.keys():
-                trnStr += '{lbl}:{{{key}:{frmt}}}'.format(lbl=v['lbl'], key=k, frmt=v['frmt'])
-        trnStr = ', '.join(trnStr).format(**logs)
+                trnStr.append('{lbl}:{{{key}:{frmt}}}'.format(lbl=v['lbl'], key=k, frmt=v['frmt']).format(**logs))
+        trnStr = ', '.join(trnStr)
 
         vldStr = []
         for k, v in self.cmd_elements.items():
             if ('val_'+k) in logs.keys():
-                vldStr += '{lbl}:{{{key}:{frmt}}}'.format(lbl=v['lbl'], key='val_'+k, frmt=v['frmt'])
+                vldStr.append('{lbl}:{{{key}:{frmt}}}'.format(lbl=v['lbl'], key='val_'+k, frmt=v['frmt']).format(**logs))
         vldStr = ', '.join(vldStr).format(**logs)
 
         evlStr = []
         for k, v in self.cmd_elements.items():
             if ('evl_'+k) in logs.keys():
-                evlStr += '{lbl}:{{{key}:{frmt}}}'.format(lbl=v['lbl'], key='evl_'+k, frmt=v['frmt'])
+                evlStr.append('{lbl}:{{{key}:{frmt}}}'.format(lbl=v['lbl'], key='evl_'+k, frmt=v['frmt']).format(**logs))
         evlStr = ', '.join(evlStr).format(**logs)
+
+        tstStr = []
+        for k, v in self.cmd_elements.items():
+            if ('tst_'+k) in logs.keys():
+                tstStr.append('{lbl}:{{{key}:{frmt}}}'.format(lbl=v['lbl'], key='tst_'+k, frmt=v['frmt']).format(**logs))
+        tstStr = ', '.join(tstStr).format(**logs)
 
 
         headerStr = self.epcStr.format(zPad=len(str(self.params['epochs'])), cEpc=(epoch + 1),
                                        nEpc=self.params['epochs'], epcTF=fineEpochTime, epcTC=coarseEpochTime,
                                        lr=logs['lr'] if 'lr' in logs.keys() else K.get_value(self.model.optimizer.lr))
-        strList = [headerStr] + [trnStr] if trnStr else [] + [vldStr] if vldStr else [] + [evlStr] if vldStr else []
+        strList = [headerStr] + ['trn) ' + trnStr] if trnStr else [] + \
+                                ['vld) ' + vldStr] if vldStr else [] + \
+                                ['evl) ' + evlStr] if vldStr else [] + \
+                                ['tst) ' + tstStr] if tstStr else []
 
         print('\n'.join(strList))
 
