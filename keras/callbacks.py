@@ -1274,7 +1274,6 @@ class CMDProgress(Callback):
         self.epcStartTime = time.time()
 
     def on_epoch_end(self, epoch, logs={}):
-        print(logs)
         epcEndTime = time.time()
         coarseEpochTime = epcEndTime - self.epcEndTime
         fineEpochTime = epcEndTime - self.epcStartTime
@@ -1308,10 +1307,11 @@ class CMDProgress(Callback):
         headerStr = self.epcStr.format(zPad=len(str(self.params['epochs'])), cEpc=(epoch + 1),
                                        nEpc=self.params['epochs'], epcTF=fineEpochTime, epcTC=coarseEpochTime,
                                        lr=logs['lr'] if 'lr' in logs.keys() else K.get_value(self.model.optimizer.lr))
-        strList = [headerStr] + ['trn) ' + trnStr] if trnStr else [] + \
-                                ['vld) ' + vldStr] if vldStr else [] + \
-                                ['evl) ' + evlStr] if vldStr else [] + \
-                                ['tst) ' + tstStr] if tstStr else []
+        strList = [headerStr] + \
+                  (['trn) ' + trnStr] if trnStr else []) + \
+                  (['vld) ' + vldStr] if vldStr else []) + \
+                  (['evl) ' + evlStr] if evlStr else []) + \
+                  (['tst) ' + tstStr] if tstStr else [])
 
         print('\n'.join(strList))
 
