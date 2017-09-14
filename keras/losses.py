@@ -4,6 +4,7 @@ from . import backend as K
 from .utils.generic_utils import deserialize_keras_object
 
 
+# noinspection SpellCheckingInspection
 def mean_squared_error(y_true, y_pred):
     return K.mean(K.square(y_pred - y_true), axis=-1)
 
@@ -46,15 +47,15 @@ def logcosh(y_true, y_pred):
 
 
 def categorical_crossentropy(y_true, y_pred):
-    return K.categorical_crossentropy(y_pred, y_true)
+    return K.categorical_crossentropy(y_true, y_pred)
 
 
 def sparse_categorical_crossentropy(y_true, y_pred):
-    return K.sparse_categorical_crossentropy(y_pred, y_true)
+    return K.sparse_categorical_crossentropy(y_true, y_pred)
 
 
 def binary_crossentropy(y_true, y_pred):
-    return K.mean(K.binary_crossentropy(y_pred, y_true), axis=-1)
+    return K.mean(K.binary_crossentropy(y_true, y_pred), axis=-1)
 
 
 def kullback_leibler_divergence(y_true, y_pred):

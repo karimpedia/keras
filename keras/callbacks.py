@@ -24,10 +24,6 @@ try:
 except ImportError:
     requests = None
 
-if K.backend() == 'tensorflow':
-    import tensorflow as tf
-    from tensorflow.contrib.tensorboard.plugins import projector
-
 
 class CallbackList(object):
     """Container abstracting a list of callbacks.
@@ -238,7 +234,8 @@ class BaseLogger(Callback):
 
 
 class TerminateOnNaN(Callback):
-    """Callback that terminates training when a NaN loss is encountered."""
+    """Callback that terminates training when a NaN loss is encountered.
+    """
 
     def __init__(self):
         super(TerminateOnNaN, self).__init__()
@@ -258,7 +255,7 @@ class ProgbarLogger(Callback):
     # Arguments
         count_mode: One of "steps" or "samples".
             Whether the progress bar should
-            count samples seens or steps (batches) seen.
+            count samples seen or steps (batches) seen.
 
     # Raises
         ValueError: In case of invalid `count_mode`.
@@ -500,7 +497,7 @@ class EarlyStopping(Callback):
 
         if mode not in ['auto', 'min', 'max']:
             warnings.warn('EarlyStopping mode %s is unknown, '
-                          'fallback to auto mode.' % (self.mode),
+                          'fallback to auto mode.' % mode,
                           RuntimeWarning)
             mode = 'auto'
 
@@ -509,7 +506,7 @@ class EarlyStopping(Callback):
         elif mode == 'max':
             self.monitor_op = np.greater
         else:
-            if 'acc' in self.monitor or self.monitor.startswith('fmeasure'):
+            if 'acc' in self.monitor:
                 self.monitor_op = np.greater
             else:
                 self.monitor_op = np.less
@@ -533,7 +530,7 @@ class EarlyStopping(Callback):
                 'which is not available. Available metrics are: %s' %
                 (self.monitor, ','.join(list(logs.keys()))), RuntimeWarning
             )
-
+            return
         if self.monitor_op(current - self.min_delta, self.best):
             self.best_epoch = epoch
             self.best = current
@@ -662,7 +659,7 @@ class TensorBoard(Callback):
 
     If you have installed TensorFlow with pip, you should be able
     to launch TensorBoard from the command line:
-    ```
+    ```sh
     tensorboard --logdir=/full_path_to_your_logs
     ```
 
@@ -706,6 +703,9 @@ class TensorBoard(Callback):
         if K.backend() != 'tensorflow':
             raise RuntimeError('TensorBoard callback only works '
                                'with the TensorFlow backend.')
+        global tf, projector
+        import tensorflow as tf
+        from tensorflow.contrib.tensorboard.plugins import projector
         self.log_dir = log_dir
         self.histogram_freq = histogram_freq
         self.merged = None
@@ -733,6 +733,12 @@ class TensorBoard(Callback):
                     if self.write_grads:
                         grads = model.optimizer.get_gradients(model.total_loss,
                                                               weight)
+
+                        def is_indexed_slices(grad):
+                            return type(grad).__name__ == 'IndexedSlices'
+                        grads = [
+                            grad.values if is_indexed_slices(grad) else grad
+                            for grad in grads]
                         tf.summary.histogram('{}_grad'.format(mapped_weight_name), grads)
                     if self.write_images:
                         w_img = tf.squeeze(weight)
@@ -816,6 +822,9 @@ class TensorBoard(Callback):
     def on_epoch_end(self, epoch, logs=None):
         logs = logs or {}
 
+        if not self.validation_data and self.histogram_freq:
+            raise ValueError('If printing histograms, validation_data must be '
+                             'provided, and cannot be a generator.')
         if self.validation_data and self.histogram_freq:
             if epoch % self.histogram_freq == 0:
 
@@ -1035,6 +1044,10 @@ class CSVLogger(Callback):
                 return '"[%s]"' % (', '.join(map(str, k)))
             else:
                 return k
+
+        if self.model.stop_training:
+            # We set NA so that csv parsers do not fail for this last epoch.
+            logs = dict([(k, logs[k]) if k in logs else (k, 'NA') for k in self.keys])
 
         if not self.writer:
             self.keys = sorted(logs.keys())
